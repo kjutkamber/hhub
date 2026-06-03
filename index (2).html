@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Home Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-main: #0B0F19;
+  --bg-card: #161C2A;
+  --bg-input: #1F2738;
+  --text-main: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --text-faint: #6B7280;
+  
+  --accent-primary: #6366F1; /* Sleek Indigo */
+  --accent-primary-glow: rgba(99, 102, 241, 0.15);
+  --accent-success: #10B981; /* Emerald */
+  --accent-success-glow: rgba(16, 185, 129, 0.15);
+  --accent-warning: #EF4444; /* Rose/Coral */
+  --accent-warning-glow: rgba(239, 68, 68, 0.15);
+  --accent-gold: #F59E0B; /* Amber */
+  --accent-gold-glow: rgba(245, 158, 11, 0.15);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-focus: rgba(99, 102, 241, 0.4);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --radius: 20px;
+  --radius-sm: 12px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  background:var(--bg-main);
+  color:var(--text-main);
+  font-size:16px;
+  line-height:1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SETUP OVERLAY ── */
+#setup-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg-main);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;text-align:center;
+  overflow-y:auto;
+}
+#setup-overlay h1{font-weight:700;color:var(--text-main);font-size:36px;margin-bottom:12px;letter-spacing:-0.02em;}
+#setup-overlay p{color:var(--text-muted);font-size:15px;line-height:1.7;max-width:460px;}
+#setup-overlay .steps{text-align:left;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin:24px 0;max-width:520px;width:100%;box-shadow:var(--shadow);}
+#setup-overlay .steps h3{color:var(--accent-primary);font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px;font-weight:700;}
+#setup-overlay .step{display:flex;gap:16px;margin-bottom:18px;align-items:flex-start;}
+#setup-overlay .step:last-child{margin-bottom:0;}
+#setup-overlay .step-num{min-width:28px;height:28px;border-radius:50%;background:var(--accent-primary-glow);color:var(--accent-primary);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-top:1px;border:1px solid rgba(99,102,241,0.2);}
+#setup-overlay .step p{color:var(--text-main);font-size:14px;line-height:1.6;}
+#setup-overlay .step a{color:var(--accent-primary);text-decoration:none;font-weight:500;}
+#setup-overlay label{color:var(--text-muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;display:block;text-align:left;margin-bottom:8px;}
+#setup-overlay input{
+  width:100%;max-width:520px;padding:14px 16px;
+  background:var(--bg-input);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text-main);font-size:15px;font-family:inherit;
+  margin-bottom:16px;transition:all 0.2s;
+}
+#setup-overlay input:focus{outline:none;border-color:var(--accent-primary);box-shadow:0 0 0 3px var(--accent-primary-glow);}
+#setup-overlay input::placeholder{color:var(--text-faint);}
+#setup-overlay .go-btn{
+  background:var(--accent-primary);color:#fff;border:none;padding:16px 40px;
+  border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;
+  font-family:inherit;width:100%;max-width:520px;box-shadow:0 4px 14px rgba(99, 102, 241, 0.4);
+  transition:all .2s;
+}
+#setup-overlay .go-btn:hover{background:#5356E2;transform:translateY(-1px);}
+#setup-overlay.hidden{opacity:0;pointer-events:none;}
+
+/* ── WAKE TAP ── */
+#wake-screen{
+  position:fixed;inset:0;z-index:8888;
+  background:linear-gradient(135deg, #090D16 0%, #111827 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:opacity .5s;
+}
+#wake-screen.hidden{opacity:0;pointer-events:none;}
+#wake-screen .clock{font-weight:300;color:var(--text-main);font-size:96px;line-height:1;letter-spacing:-0.04em;}
+#wake-screen .date-str{color:var(--text-muted);font-size:20px;margin-top:12px;margin-bottom:64px;font-weight:400;}
+#wake-screen .tap-hint{color:var(--accent-primary);font-size:13px;letter-spacing:.15em;text-transform:uppercase;font-weight:600;padding:10px 24px;border-radius:30px;background:var(--accent-primary-glow);border:1px solid rgba(99,102,241,0.2);animation:pulse 2.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:.5;transform:scale(1);}50%{opacity:1;transform:scale(1.03);}}
+
+/* ── LAYOUT ── */
+#app{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-main);}
+#app.hidden{display:none;}
+
+/* ── HEADER ── */
+header{
+  background:var(--bg-card);
+  border-bottom:1px solid var(--border);
+  padding:0 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;height:72px;
+}
+.header-title{font-weight:700;font-size:22px;color:var(--text-main);letter-spacing:-0.02em;}
+.header-time{font-size:15px;color:var(--text-muted);font-weight:500;display:flex;align-items:center;}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#4B5563;display:inline-block;margin-left:10px;position:relative;}
+.conn-dot.online{background:var(--accent-success);box-shadow:0 0 10px var(--accent-success);}
+
+/* ── TABS ── */
+.tabs{
+  display:flex;background:var(--bg-card);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;padding:0 12px;
+}
+.tab-btn{
+  flex:1;padding:18px 8px 14px;text-align:center;cursor:pointer;
+  font-size:12px;font-weight:600;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;
+  border-bottom:3px solid transparent;transition:all .2s;
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.tab-btn:hover{color:var(--text-main);}
+.tab-btn.active{color:var(--accent-primary);border-bottom-color:var(--accent-primary);}
+.tab-icon{font-size:20px;display:block;}
+.badge-count{
+  position:absolute;top:12px;right:calc(50% - 24px);
+  background:var(--accent-primary);color:#fff;border-radius:10px;
+  font-size:10px;font-weight:700;padding:2px 6px;min-width:18px;
+  display:none;box-shadow:0 2px 8px var(--accent-primary-glow);
+}
+.badge-count.show{display:block;}
+
+/* ── PANELS ── */
+.panels{flex:1;overflow:hidden;position:relative;}
+.panel{
+  position:absolute;inset:0;overflow-y:auto;
+  padding:24px 20px;
+  display:none;
+  -webkit-overflow-scrolling:touch;
+}
+.panel.active{display:block;}
+
+/* ── SECTION CARD ── */
+.section-card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-bottom:20px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.section-head{
+  padding:18px 24px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;
+}
+.section-head-icon{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.icon-rust{background:var(--accent-warning-glow);color:var(--accent-warning);}
+.icon-sage{background:var(--accent-success-glow);color:var(--accent-success);}
+.icon-gold{background:var(--accent-gold-glow);color:var(--accent-gold);}
+.section-head h2{font-size:16px;font-weight:600;color:var(--text-main);letter-spacing:-0.01em;}
+.section-body{padding:24px;}
+
+/* ── INPUTS ── */
+.field{margin-bottom:16px;}
+.field:last-child{margin-bottom:0;}
+.field label{font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:8px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:13px 16px;
+  background:var(--bg-input);border:1px solid var(--border);
+  border-radius:var(--radius-sm);font-size:15px;color:var(--text-main);
+  font-family:inherit;transition:all 0.15s;
+  -webkit-appearance:none;appearance:none;
+}
+.field select{
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239CA3AF'><path d='M4 6l4 4 4-4/></svg>");
+  background-repeat: no-repeat;background-position: right 16px center;padding-right: 40px;
+}
+.field textarea{height:90px;resize:none;}
+.field input:focus,.field textarea:focus,.field select:focus{
+  outline:none;border-color:var(--accent-primary);background:var(--bg-input);
+  box-shadow:0 0 0 3px var(--accent-primary-glow);
+}
+.row-fields{display:flex;gap:12px;}
+.row-fields .field{flex:1;margin-bottom:0;}
+
+/* ── BUTTONS ── */
+.btn{
+  width:100%;padding:14px;border:none;border-radius:var(--radius-sm);
+  font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;
+  transition:all .15s ease;
+}
+.btn:active{transform:scale(0.98);}
+.btn-rust{background:var(--accent-warning);color:#fff;box-shadow:0 4px 12px var(--accent-warning-glow);}
+.btn-rust:hover{background:#E03E3E;}
+.btn-sage{background:var(--accent-success);color:#fff;box-shadow:0 4px 12px var(--accent-success-glow);}
+.btn-sage:hover{background:#0E9F6E;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-muted);}
+.btn-outline:hover{background:rgba(255,255,255,0.02);color:var(--text-main);}
+
+/* ── WHO PICKER ── */
+.who-picker{display:flex;gap:10px;margin-bottom:16px;}
+.who-chip{
+  flex:1;padding:12px 8px;text-align:center;border-radius:var(--radius-sm);
+  border:1px solid var(--border);cursor:pointer;font-size:14px;font-weight:600;
+  color:var(--text-muted);background:var(--bg-input);transition:all .15s;
+}
+.who-chip.sel{border-color:var(--accent-primary);background:var(--accent-primary-glow);color:var(--accent-primary);}
+
+/* ── CALENDAR ── */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.cal-nav-btn{
+  width:40px;height:40px;border-radius:50%;background:var(--bg-input);border:1px solid var(--border);
+  cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;color:var(--text-main);
+  transition:all 0.15s;
+}
+.cal-nav-btn:hover{background:rgba(255,255,255,0.05);border-color:var(--text-faint);}
+.cal-month{font-weight:700;font-size:18px;color:var(--text-main);letter-spacing:-0.01em;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.cal-dname{text-align:center;font-size:11px;font-weight:700;color:var(--text-faint);padding:4px 0;letter-spacing:.08em;text-transform:uppercase;}
+.cal-day{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:var(--radius-sm);cursor:default;font-size:14px;color:var(--text-main);position:relative;
+  background:rgba(255,255,255,0.02);font-weight:500;
+}
+.cal-day.other{color:var(--text-faint);background:transparent;opacity:0.4;}
+.cal-day.today{background:var(--accent-primary);color:#fff;font-weight:700;box-shadow:0 4px 12px var(--accent-primary-glow);}
+.cal-day.has-ev .ev-dot{
+  position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+  width:5px;height:5px;border-radius:50%;background:var(--accent-gold);
+}
+.cal-day.today .ev-dot{background:#fff;}
+
+/* ── EVENT / TASK / MESSAGE ITEMS ── */
+.item{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 0;border-bottom:1px solid var(--border);
+}
+.item:last-child{border-bottom:none;}
+.item-left{flex:1;min-width:0;}
+.item-title{font-size:15px;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.item-title.done{text-decoration:line-through;color:var(--text-faint);font-weight:400;}
+.item-sub{font-size:13px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:6px;}
+.item-del{
+  background:var(--bg-input);border:1px solid var(--border);cursor:pointer;color:var(--text-muted);
+  font-size:18px;line-height:1;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+}
+.item-del:hover{color:var(--accent-warning);border-color:rgba(239,68,68,0.3);background:var(--accent-warning-glow);}
+.check-ring{
+  width:24px;height:24px;min-width:24px;border-radius:50%;
+  border:2px solid var(--text-faint);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;background:transparent;
+}
+.check-ring.done{background:var(--accent-success);border-color:var(--accent-success);box-shadow:0 2px 8px var(--accent-success-glow);}
+.check-ring svg{display:none;}
+.check-ring.done svg{display:block;}
+
+.tag{
+  display:inline-block;padding:2px 8px;border-radius:6px;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.02em;
+}
+.tag-warn{background:var(--accent-warning-glow);color:var(--accent-warning);}
+.tag-ok{background:var(--accent-success-glow);color:var(--accent-success);}
+.tag-info{background:var(--accent-primary-glow);color:#A5B4FC;margin-left:6px;}
+.empty-msg{font-size:14px;color:var(--text-faint);text-align:center;padding:32px 0;font-style:italic;}
+
+/* ── MESSAGE BUBBLES ── */
+.msg-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;margin-bottom:16px;position:relative;box-shadow:var(--shadow);
+}
+.msg-who{font-weight:700;font-size:12px;color:var(--accent-primary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;}
+.msg-text{font-size:15px;color:var(--text-main);line-height:1.6;}
+.msg-time{font-size:12px;color:var(--text-faint);margin-top:10px;font-weight:500;}
+.msg-del{
+  position:absolute;top:16px;right:16px;background:var(--bg-input);border:1px solid var(--border);
+  cursor:pointer;color:var(--text-muted);font-size:18px;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;transition:all 0.15s;
+}
+.msg-del:hover{color:var(--accent-warning);border-color:rgba(239,68,68,0.3);background:var(--accent-warning-glow);}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1E293B;color:#fff;padding:14px 28px;border-radius:40px;
+  font-size:14px;font-weight:600;opacity:0;transition:all .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events:none;z-index:5000;box-shadow:0 10px 25px rgba(0,0,0,0.5);
+  border:1px solid rgba(255,255,255,0.1);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── SCROLLBAR ── */
+.panel::-webkit-scrollbar{width:5px;}
+.panel::-webkit-scrollbar-track{background:transparent;}
+.panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+</style>
+</head>
+<body>
+
+<div id="setup-overlay">
+  <h1>🏠 Home Hub Setup</h1>
+  <p>Follow these steps once to connect your home iPad and your phone so they stay in sync in real time.</p>
+
+  <div class="steps">
+    <h3>📋 Step-by-step (takes about 10 minutes)</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <p>Open <a href="https://firebase.google.com" target="_blank">firebase.google.com</a> on your computer or phone. Sign in with a Google account (Gmail is fine).</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <p>Click <strong>Go to Console</strong> → <strong>Add project</strong>. Name it anything (e.g. <em>Home Hub</em>). Disable Google Analytics when asked (you don't need it). Click <strong>Create project</strong>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <p>In the left menu click <strong>Build → Realtime Database</strong> → <strong>Create Database</strong>. Choose any location, then select <strong>Start in test mode</strong> and click <strong>Enable</strong>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <p>Go to <strong>Project Settings</strong> (gear icon top-left) → scroll down to <strong>Your apps</strong> → click the <strong>&lt;/&gt;</strong> (web) icon → register app (any name) → you'll see a block of code. Find these values: <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <p>Paste each value into the boxes below, then tap <strong>Save &amp; Open App</strong>. Do this on both the iPad and your phone — same values both times.</p>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:520px;">
+    <div class="field"><label>apiKey</label><input id="s-apiKey" placeholder="AIzaSy..."></div>
+    <div class="field"><label>authDomain</label><input id="s-authDomain" placeholder="your-app.firebaseapp.com"></div>
+    <div class="field"><label>databaseURL</label><input id="s-databaseURL" placeholder="https://your-app-default-rtdb.firebaseio.com"></div>
+    <div class="field"><label>projectId</label><input id="s-projectId" placeholder="your-app-id"></div>
+    <button class="go-btn" onclick="saveConfig()">Save &amp; Open App</button>
+  </div>
+</div>
+
+<div id="wake-screen" class="hidden" onclick="wakeUp()">
+  <div class="clock" id="wake-clock">00:00</div>
+  <div class="date-str" id="wake-date"></div>
+  <div class="tap-hint">Tap anywhere to start</div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <span class="header-title">🏠 Home Hub</span>
+    <span class="header-time" id="header-time">
+      <span id="live-time"></span>
+      <span class="conn-dot" id="conn-dot" title="Connection status"></span>
+    </span>
+  </header>
+
+  <div class="tabs">
+    <div class="tab-btn active" onclick="switchTab('cal')" id="tab-cal">
+      <span class="tab-icon">📅</span>Calendar
+    </div>
+    <div class="tab-btn" onclick="switchTab('tasks')" id="tab-tasks">
+      <span class="tab-icon">✅</span>Tasks
+      <span class="badge-count" id="badge-tasks">0</span>
+    </div>
+    <div class="tab-btn" onclick="switchTab('board')" id="tab-board">
+      <span class="tab-icon">💬</span>Board
+      <span class="badge-count" id="badge-board">0</span>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel active" id="panel-cal">
+      <div class="section-card">
+        <div class="section-body">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+            <span class="cal-month" id="cal-month-label"></span>
+            <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-rust">📅</div>
+          <h2>Add Event</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Title</label><input id="ev-title" type="text" placeholder="e.g. Doctor appointment"></div>
+          <div class="row-fields">
+            <div class="field"><label>Date</label><input id="ev-date" type="date"></div>
+            <div class="field"><label>Time</label><input id="ev-time" type="time"></div>
+          </div>
+          <div class="field"><label>Who</label>
+            <select id="ev-who">
+              <option>Everyone</option>
+              <option>Katarina</option>
+              <option>Stevan</option>
+            </select>
+          </div>
+          <button class="btn btn-rust" onclick="addEvent()">Add to Calendar</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-gold">📋</div>
+          <h2>Upcoming Events</h2>
+        </div>
+        <div class="section-body" id="ev-list"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-tasks">
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-sage">➕</div>
+          <h2>Add Task</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Task</label><input id="task-text" type="text" placeholder="e.g. Buy milk"></div>
+          <div class="row-fields">
+            <div class="field"><label>Due date</label><input id="task-due" type="date"></div>
+            <div class="field"><label>For</label>
+              <select id="task-who">
+                <option>Everyone</option>
+                <option>Katarina</option>
+                <option>Stevan</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-sage" onclick="addTask()">Add Task</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-sage">✅</div>
+          <h2>Task List</h2>
+        </div>
+        <div class="section-body" id="task-list"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-board">
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-rust">💬</div>
+          <h2>Leave a Message</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Who's posting?</label>
+            <div class="who-picker">
+              <div class="who-chip sel" onclick="pickWho(this,'Katarina')">Katarina</div>
+              <div class="who-chip" onclick="pickWho(this,'Stevan')">Stevan</div>
+            </div>
+          </div>
+          <div class="field"><label>Message</label><textarea id="msg-text" placeholder="Leave a note for the family…"></textarea></div>
+          <button class="btn btn-rust" onclick="addMessage()">Post Message</button>
+        </div>
+      </div>
+      <div id="msg-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+// ── STATE ──
+var db = null;
+var audioCtx = null;
+var audioUnlocked = false;
+var currentWho = 'Katarina';
+var viewYear, viewMonth;
+var knownMsgIds = {};
+var knownTaskIds = {};
+var knownEvIds = {};
+var firstLoad = { events: true, tasks: true, messages: true };
+var unreadMsgs = 0, unreadTasks = 0;
+
+// ── CONFIG ──
+function saveConfig() {
+  var keys = ['apiKey','authDomain','databaseURL','projectId'];
+  var cfg = {};
+  for (var i = 0; i < keys.length; i++) {
+    var val = document.getElementById('s-' + keys[i]).value.trim();
+    if (!val) { alert('Please fill in: ' + keys[i]); return; }
+    cfg[keys[i]] = val;
+  }
+  try { localStorage.setItem('hh_config', JSON.stringify(cfg)); } catch(e) {}
+  startApp(cfg);
+}
+
+function loadConfig() {
+  try {
+    var s = localStorage.getItem('hh_config');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return null;
+}
+
+// ── BOOT ──
+window.onload = function() {
+  var cfg = loadConfig();
+  if (cfg) {
+    startApp(cfg);
+  } else {
+    document.getElementById('setup-overlay').style.display = 'flex';
+  }
+};
+
+function startApp(cfg) {
+  document.getElementById('setup-overlay').classList.add('hidden');
+  setTimeout(function() { document.getElementById('setup-overlay').style.display = 'none'; }, 500);
+
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: cfg.apiKey,
+        authDomain: cfg.authDomain,
+        databaseURL: cfg.databaseURL,
+        projectId: cfg.projectId
+      });
+    }
+    db = firebase.database();
+    document.getElementById('conn-dot').classList.add('online');
+    listenAll();
+  } catch(e) {
+    showToast('Firebase error: ' + e.message);
+  }
+
+  var now = new Date();
+  viewYear = now.getFullYear();
+  viewMonth = now.getMonth();
+
+  var todayStr = now.toISOString().slice(0,10);
+  document.getElementById('ev-date').value = todayStr;
+  document.getElementById('task-due').value = todayStr;
+
+  showWakeScreen();
+  tickClock();
+  setInterval(tickClock, 1000);
+}
+
+// ── WAKE SCREEN ──
+function showWakeScreen() {
+  document.getElementById('wake-screen').classList.remove('hidden');
+  tickWakeClock();
+  setInterval(tickWakeClock, 1000);
+}
+
+function tickWakeClock() {
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes();
+  document.getElementById('wake-clock').textContent =
+    (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('wake-date').textContent =
+    days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()];
+}
+
+function wakeUp() {
+  unlockAudio();
+  document.getElementById('wake-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  renderCal();
+  renderEvents();
+  renderTasks();
+  renderMessages();
+}
+
+// ── CLOCK ──
+function tickClock() {
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes();
+  document.getElementById('live-time').textContent =
+    (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+}
+
+// ── AUDIO ──
+function unlockAudio() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var buf = audioCtx.createBuffer(1, 1, 22050);
+    var src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+    audioUnlocked = true;
+  } catch(e) {}
+}
+
+function beep(type) {
+  if (!audioUnlocked || !audioCtx) return;
+  try {
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    var t = audioCtx.currentTime;
+    if (type === 'add') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(660, t);
+      o.frequency.setValueAtTime(880, t + 0.12);
+      o.frequency.setValueAtTime(1100, t + 0.22);
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.4);
+      o.start(t); o.stop(t + 0.4);
+    } else if (type === 'done') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(440, t);
+      o.frequency.setValueAtTime(554, t + 0.1);
+      o.frequency.setValueAtTime(659, t + 0.2);
+      o.frequency.setValueAtTime(880, t + 0.3);
+      g.gain.setValueAtTime(0.2, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.5);
+      o.start(t); o.stop(t + 0.5);
+    } else if (type === 'notify') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, t);
+      o.frequency.setValueAtTime(1100, t + 0.08);
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.3);
+      o.start(t); o.stop(t + 0.3);
+      var o2 = audioCtx.createOscillator();
+      var g2 = audioCtx.createGain();
+      o2.connect(g2); g2.connect(audioCtx.destination);
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(880, t + 0.35);
+      o2.frequency.setValueAtTime(1100, t + 0.43);
+      g2.gain.setValueAtTime(0.18, t + 0.35);
+      g2.gain.linearRampToValueAtTime(0, t + 0.65);
+      o2.start(t + 0.35); o2.stop(t + 0.65);
+    }
+  } catch(e) {}
+}
+
+// ── TABS ──
+function switchTab(name) {
+  ['cal','tasks','board'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('panel-' + t).classList.toggle('active', t === name);
+  });
+  if (name === 'board') { unreadMsgs = 0; updateBadge('board', 0); }
+  if (name === 'tasks') { unreadTasks = 0; updateBadge('tasks', 0); }
+}
+
+function updateBadge(which, count) {
+  var el = document.getElementById('badge-' + which);
+  if (count > 0) { el.textContent = count; el.classList.add('show'); }
+  else { el.classList.remove('show'); }
+}
+
+// ── FIREBASE LISTENERS ──
+function listenAll() {
+  if (!db) return;
+
+  db.ref('events').on('child_added', function(snap) {
+    var ev = snap.val(); ev._id = snap.key;
+    if (!firstLoad.events && !knownEvIds[snap.key]) { beep('notify'); showToast('📅 New event: ' + ev.title); }
+    knownEvIds[snap.key] = true;
+    renderEvents(); renderCal();
+  });
+  db.ref('events').on('child_removed', function(snap) {
+    delete knownEvIds[snap.key]; renderEvents(); renderCal();
+  });
+  db.ref('events').once('value', function() { firstLoad.events = false; });
+
+  db.ref('tasks').on('child_added', function(snap) {
+    var t = snap.val();
+    if (!firstLoad.tasks && !knownTaskIds[snap.key]) {
+      beep('notify'); showToast('✅ New task: ' + t.text);
+      unreadTasks++; updateBadge('tasks', unreadTasks);
+    }
+    knownTaskIds[snap.key] = true;
+    renderTasks();
+  });
+  db.ref('tasks').on('child_changed', function() { renderTasks(); });
+  db.ref('tasks').on('child_removed', function(snap) { delete knownTaskIds[snap.key]; renderTasks(); });
+  db.ref('tasks').once('value', function() { firstLoad.tasks = false; });
+
+  db.ref('messages').on('child_added', function(snap) {
+    var m = snap.val();
+    if (!firstLoad.messages && !knownMsgIds[snap.key]) {
+      beep('notify'); showToast('💬 ' + m.who + ': ' + m.text.slice(0,40));
+      unreadMsgs++; updateBadge('board', unreadMsgs);
+    }
+    knownMsgIds[snap.key] = true;
+    renderMessages();
+  });
+  db.ref('messages').on('child_removed', function(snap) { delete knownMsgIds[snap.key]; renderMessages(); });
+  db.ref('messages').once('value', function() { firstLoad.messages = false; });
+}
+
+// ── CALENDAR ──
+var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function changeMonth(d) {
+  viewMonth += d;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  renderCal();
+}
+
+function getEventDates() {
+  var dates = {};
+  if (!db) return dates;
+  db.ref('events').once('value', function(snap) {
+    snap.forEach(function(c) {
+      var e = c.val();
+      if (e.date) {
+        var d = new Date(e.date + 'T00:00:00');
+        if (d.getFullYear() === viewYear && d.getMonth() === viewMonth)
+          dates[d.getDate()] = true;
+      }
+    });
+    renderCalWithDates(dates);
+  });
+  return dates;
+}
+
+function renderCal() {
+  document.getElementById('cal-month-label').textContent = MONTHS[viewMonth] + ' ' + viewYear;
+  if (db) getEventDates();
+  else renderCalWithDates({});
+}
+
+function renderCalWithDates(evDates) {
+  var grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(function(d) {
+    var el = document.createElement('div');
+    el.className = 'cal-dname'; el.textContent = d;
+    grid.appendChild(el);
+  });
+  var first = new Date(viewYear, viewMonth, 1).getDay();
+  var days = new Date(viewYear, viewMonth + 1, 0).getDate();
+  var prevDays = new Date(viewYear, viewMonth, 0).getDate();
+  var today = new Date();
+
+  for (var i = 0; i < first; i++) {
+    var el = document.createElement('div');
+    el.className = 'cal-day other';
+    el.textContent = prevDays - first + 1 + i;
+    grid.appendChild(el);
+  }
+  for (var d = 1; d <= days; d++) {
+    var el = document.createElement('div');
+    var cls = 'cal-day';
+    var isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+    if (isToday) cls += ' today';
+    if (evDates[d]) cls += ' has-ev';
+    el.className = cls;
+    el.textContent = d;
+    if (evDates[d]) { var dot = document.createElement('div'); dot.className = 'ev-dot'; el.appendChild(dot); }
+    grid.appendChild(el);
+  }
+}
+
+// ── EVENTS ──
+function addEvent() {
+  var title = document.getElementById('ev-title').value.trim();
+  var date = document.getElementById('ev-date').value;
+  if (!title || !date) { showToast('Please fill in title and date'); return; }
+  var ev = {
+    title: title, date: date,
+    time: document.getElementById('ev-time').value,
+    who: document.getElementById('ev-who').value,
+    created: Date.now()
+  };
+  if (db) {
+    db.ref('events').push(ev);
+  }
+  beep('add');
+  document.getElementById('ev-title').value = '';
+  document.getElementById('ev-time').value = '';
+  showToast('Event added!');
+}
+
+// Modernized Dynamic Elements Inside Render Injection
+function renderEvents() {
+  var list = document.getElementById('ev-list');
+  if (!db) { list.innerHTML = '<p class="empty-msg">Connect to Firebase to see events.</p>'; return; }
+  db.ref('events').orderByChild('date').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) { list.innerHTML = '<p class="empty-msg">No events yet — add one above.</p>'; return; }
+    var today = new Date().toISOString().slice(0, 10);
+    items.forEach(function(ev) {
+      var past = ev.date < today;
+      var row = document.createElement('div'); row.className = 'item';
+      var whoTag = ev.who && ev.who !== 'Everyone' ? '<span class="tag tag-info">' + esc(ev.who) + '</span>' : '';
+      row.innerHTML = '<div class="item-left">'
+        + '<div class="item-title' + (past ? ' done' : '') + '">' + esc(ev.title) + whoTag + '</div>'
+        + '<div class="item-sub">' + esc(ev.date) + (ev.time ? ' at ' + esc(ev.time) : '') + '</div>'
+        + '</div>'
+        + '<button class="item-del" onclick="delEvent(\'' + ev._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(row);
+    });
+  });
+}
+
+function delEvent(id) {
+  if (db) db.ref('events/' + id).remove();
+}
+
+// ── TASKS ──
+function addTask() {
+  var text = document.getElementById('task-text').value.trim();
+  if (!text) { showToast('Please enter a task'); return; }
+  var task = {
+    text: text,
+    due: document.getElementById('task-due').value,
+    who: document.getElementById('task-who').value,
+    done: false,
+    created: Date.now()
+  };
+  if (db) db.ref('tasks').push(task);
+  beep('add');
+  document.getElementById('task-text').value = '';
+  showToast('Task added!');
+}
+
+function toggleTask(id, done) {
+  if (db) {
+    db.ref('tasks/' + id).update({ done: !done });
+    if (!done) beep('done');
+  }
+}
+
+function delTask(id) {
+  if (db) db.ref('tasks/' + id).remove();
+}
+
+function renderTasks() {
+  var list = document.getElementById('task-list');
+  if (!db) { list.innerHTML = '<p class="empty-msg">Connect to Firebase to see tasks.</p>'; return; }
+  db.ref('tasks').orderByChild('created').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) { list.innerHTML = '<p class="empty-msg">No tasks yet — add one above.</p>'; return; }
+    var today = new Date().toISOString().slice(0, 10);
+    items.sort(function(a, b) { return (a.done === b.done) ? 0 : a.done ? 1 : -1; });
+    items.forEach(function(task) {
+      var row = document.createElement('div'); row.className = 'item';
+      var overdue = task.due && task.due < today && !task.done;
+      var dueTag = task.due ? '<span class="tag ' + (overdue ? 'tag-warn' : 'tag-ok') + '">' + (overdue ? 'Overdue' : esc(task.due)) + '</span>' : '';
+      var whoTag = task.who && task.who !== 'Everyone' ? '<span class="tag tag-info">' + esc(task.who) + '</span>' : '';
+      row.innerHTML = '<div class="check-ring' + (task.done ? ' done' : '') + '" onclick="toggleTask(\'' + task._id + '\',' + task.done + ')" role="checkbox" aria-checked="' + task.done + '" tabindex="0">'
+        + '<svg width="12" height="10" viewBox="0 0 12 10" fill="none"><polyline points="1,5 4,8 11,1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '</div>'
+        + '<div class="item-left"><div class="item-title' + (task.done ? ' done' : '') + '">' + esc(task.text) + whoTag + '</div>'
+        + '<div class="item-sub">' + dueTag + '</div></div>'
+        + '<button class="item-del" onclick="delTask(\'' + task._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(row);
+    });
+  });
+}
+
+// ── MESSAGES ──
+function pickWho(el, name) {
+  document.querySelectorAll('.who-chip').forEach(function(c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  currentWho = name;
+}
+
+function addMessage() {
+  var text = document.getElementById('msg-text').value.trim();
+  if (!text) { showToast('Please write a message'); return; }
+  var now = new Date();
+  var msg = {
+    who: currentWho, text: text,
+    time: now.toLocaleDateString('en-GB', {day:'numeric',month:'short'}) + ' ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    created: Date.now()
+  };
+  if (db) db.ref('messages').push(msg);
+  beep('add');
+  document.getElementById('msg-text').value = '';
+  showToast('Message posted!');
+}
+
+function delMsg(id) {
+  if (db) db.ref('messages/' + id).remove();
+}
+
+function renderMessages() {
+  var list = document.getElementById('msg-list');
+  if (!db) { list.innerHTML = '<div class="section-card"><div class="section-body"><p class="empty-msg">Connect to Firebase to see messages.</p></div></div>'; return; }
+  db.ref('messages').orderByChild('created').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) {
+      list.innerHTML = '<div class="section-card"><div class="section-body"><p class="empty-msg">No messages yet — be the first!</p></div></div>';
+      return;
+    }
+    items.reverse().forEach(function(m) {
+      var card = document.createElement('div'); card.className = 'msg-card';
+      card.innerHTML = '<div class="msg-who">' + esc(m.who) + '</div>'
+        + '<div class="msg-text">' + esc(m.text) + '</div>'
+        + '<div class="msg-time">' + esc(m.time) + '</div>'
+        + '<button class="msg-del" onclick="delMsg(\'' + m._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(card);
+    });
+  });
+}
+
+// ── TOAST ──
+var toastTimer;
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2800);
+}
+
+// ── UTIL ──
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
