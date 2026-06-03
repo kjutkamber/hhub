@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Home Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #F7F3EE;
+  --warm-white: #FDFAF7;
+  --ink: #1C1917;
+  --ink-soft: #44403C;
+  --ink-muted: #78716C;
+  --ink-faint: #A8A29E;
+  --rust: #C2410C;
+  --rust-light: #FEE8DC;
+  --rust-mid: #EA6C38;
+  --sage: #3D6B58;
+  --sage-light: #DCEEE7;
+  --gold: #92712A;
+  --gold-light: #FDF3DC;
+  --border: rgba(28,25,23,0.10);
+  --border-strong: rgba(28,25,23,0.18);
+  --shadow: 0 2px 16px rgba(28,25,23,0.08);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--cream);
+  color:var(--ink);
+  font-size:16px;
+  line-height:1.5;
+}
+
+/* ── SETUP OVERLAY ── */
+#setup-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;text-align:center;
+  transition:opacity .4s;
+}
+#setup-overlay h1{font-family:'DM Serif Display',serif;color:var(--cream);font-size:32px;margin-bottom:12px;}
+#setup-overlay p{color:var(--ink-faint);font-size:15px;line-height:1.7;max-width:460px;}
+#setup-overlay .steps{text-align:left;background:rgba(255,255,255,0.06);border-radius:var(--radius);padding:24px 28px;margin:24px 0;max-width:520px;width:100%;}
+#setup-overlay .steps h3{color:var(--rust-mid);font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;font-weight:600;}
+#setup-overlay .step{display:flex;gap:14px;margin-bottom:14px;align-items:flex-start;}
+#setup-overlay .step-num{min-width:26px;height:26px;border-radius:50%;background:var(--rust);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-top:1px;}
+#setup-overlay .step p{color:rgba(247,243,238,0.8);font-size:14px;line-height:1.6;}
+#setup-overlay .step a{color:var(--rust-mid);}
+#setup-overlay label{color:var(--ink-faint);font-size:13px;display:block;text-align:left;margin-bottom:6px;}
+#setup-overlay input{
+  width:100%;max-width:520px;padding:14px 16px;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);
+  border-radius:var(--radius-sm);color:var(--cream);font-size:15px;font-family:'DM Sans',sans-serif;
+  margin-bottom:12px;
+}
+#setup-overlay input::placeholder{color:rgba(255,255,255,0.25);}
+#setup-overlay .go-btn{
+  background:var(--rust);color:#fff;border:none;padding:16px 40px;
+  border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;
+  font-family:'DM Sans',sans-serif;width:100%;max-width:520px;
+  transition:background .15s;
+}
+#setup-overlay .go-btn:hover{background:var(--rust-mid);}
+#setup-overlay.hidden{opacity:0;pointer-events:none;}
+
+/* ── WAKE TAP ── */
+#wake-screen{
+  position:fixed;inset:0;z-index:8888;
+  background:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:opacity .5s;
+}
+#wake-screen.hidden{opacity:0;pointer-events:none;}
+#wake-screen .clock{font-family:'DM Serif Display',serif;color:var(--cream);font-size:72px;line-height:1;}
+#wake-screen .date-str{color:var(--ink-faint);font-size:18px;margin-top:8px;margin-bottom:48px;}
+#wake-screen .tap-hint{color:rgba(247,243,238,0.35);font-size:14px;letter-spacing:.1em;text-transform:uppercase;animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.7}}
+
+/* ── LAYOUT ── */
+#app{height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+#app.hidden{display:none;}
+
+/* ── HEADER ── */
+header{
+  background:var(--warm-white);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+  height:64px;
+}
+.header-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink);}
+.header-time{font-size:14px;color:var(--ink-muted);font-weight:300;}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#9CA3AF;display:inline-block;margin-left:8px;transition:background .3s;}
+.conn-dot.online{background:#22C55E;}
+
+/* ── TABS ── */
+.tabs{
+  display:flex;background:var(--warm-white);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.tab-btn{
+  flex:1;padding:14px 8px 12px;text-align:center;cursor:pointer;
+  font-size:12px;font-weight:500;color:var(--ink-muted);letter-spacing:.04em;text-transform:uppercase;
+  border-bottom:3px solid transparent;transition:color .15s,border-color .15s;
+  position:relative;
+}
+.tab-btn.active{color:var(--rust);border-bottom-color:var(--rust);}
+.tab-icon{font-size:20px;display:block;margin-bottom:3px;}
+.badge-count{
+  position:absolute;top:10px;right:calc(50% - 18px);
+  background:var(--rust);color:#fff;border-radius:10px;
+  font-size:10px;font-weight:700;padding:1px 5px;min-width:16px;
+  display:none;
+}
+.badge-count.show{display:block;}
+
+/* ── PANELS ── */
+.panels{flex:1;overflow:hidden;position:relative;}
+.panel{
+  position:absolute;inset:0;overflow-y:auto;
+  padding:20px 16px 24px;
+  display:none;
+  -webkit-overflow-scrolling:touch;
+}
+.panel.active{display:block;}
+
+/* ── SECTION CARD ── */
+.section-card{
+  background:var(--warm-white);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-bottom:16px;
+  overflow:hidden;
+}
+.section-head{
+  padding:14px 18px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.section-head-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.icon-rust{background:var(--rust-light);color:var(--rust);}
+.icon-sage{background:var(--sage-light);color:var(--sage);}
+.icon-gold{background:var(--gold-light);color:var(--gold);}
+.section-head h2{font-size:15px;font-weight:600;color:var(--ink);}
+.section-body{padding:16px 18px;}
+
+/* ── INPUTS ── */
+.field{margin-bottom:12px;}
+.field label{font-size:12px;font-weight:600;color:var(--ink-muted);letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:5px;}
+.field input,.field textarea,.field select{
+  width:100%;padding:11px 14px;
+  background:var(--cream);border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);font-size:15px;color:var(--ink);
+  font-family:'DM Sans',sans-serif;
+  -webkit-appearance:none;appearance:none;
+}
+.field textarea{height:80px;resize:none;}
+.field input:focus,.field textarea:focus,.field select:focus{
+  outline:none;border-color:var(--rust);background:#fff;
+}
+.row-fields{display:flex;gap:10px;}
+.row-fields .field{flex:1;}
+
+/* ── BUTTONS ── */
+.btn{
+  width:100%;padding:13px;border:none;border-radius:var(--radius-sm);
+  font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;
+  transition:transform .1s,opacity .1s;
+}
+.btn:active{transform:scale(0.98);}
+.btn-rust{background:var(--rust);color:#fff;}
+.btn-sage{background:var(--sage);color:#fff;}
+.btn-outline{background:transparent;border:1px solid var(--border-strong);color:var(--ink-soft);}
+
+/* ── WHO PICKER ── */
+.who-picker{display:flex;gap:8px;margin-bottom:14px;}
+.who-chip{
+  flex:1;padding:10px 8px;text-align:center;border-radius:var(--radius-sm);
+  border:1.5px solid var(--border-strong);cursor:pointer;font-size:14px;font-weight:500;
+  color:var(--ink-soft);background:var(--cream);transition:all .15s;
+}
+.who-chip.sel{border-color:var(--rust);background:var(--rust-light);color:var(--rust);}
+
+/* ── CALENDAR ── */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cal-nav-btn{
+  width:36px;height:36px;border-radius:50%;background:var(--cream);border:1px solid var(--border-strong);
+  cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);
+}
+.cal-month{font-family:'DM Serif Display',serif;font-size:20px;color:var(--ink);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-dname{text-align:center;font-size:11px;font-weight:600;color:var(--ink-faint);padding:4px 0;letter-spacing:.05em;}
+.cal-day{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-radius:8px;cursor:default;font-size:14px;color:var(--ink-soft);position:relative;
+}
+.cal-day.other{color:var(--ink-faint);}
+.cal-day.today{background:var(--rust);color:#fff;font-weight:600;}
+.cal-day.has-ev .ev-dot{
+  position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--rust-mid);
+}
+.cal-day.today .ev-dot{background:#fff;}
+
+/* ── EVENT / TASK / MESSAGE ITEMS ── */
+.item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 0;border-bottom:1px solid var(--border);
+}
+.item:last-child{border-bottom:none;}
+.item-left{flex:1;min-width:0;}
+.item-title{font-size:15px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.item-title.done{text-decoration:line-through;color:var(--ink-faint);}
+.item-sub{font-size:13px;color:var(--ink-muted);margin-top:2px;}
+.item-del{
+  background:none;border:none;cursor:pointer;color:var(--ink-faint);
+  font-size:22px;line-height:1;padding:0 2px;flex-shrink:0;margin-top:-2px;
+}
+.item-del:hover{color:var(--rust);}
+.check-ring{
+  width:24px;height:24px;min-width:24px;border-radius:50%;
+  border:2px solid var(--border-strong);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;margin-top:2px;
+  transition:all .15s;
+}
+.check-ring.done{background:var(--sage);border-color:var(--sage);}
+.check-ring svg{display:none;}
+.check-ring.done svg{display:block;}
+.tag{
+  display:inline-block;padding:2px 8px;border-radius:6px;
+  font-size:11px;font-weight:600;margin-left:6px;vertical-align:middle;
+}
+.tag-warn{background:var(--rust-light);color:var(--rust);}
+.tag-ok{background:var(--sage-light);color:var(--sage);}
+.tag-info{background:var(--gold-light);color:var(--gold);}
+.empty-msg{font-size:14px;color:var(--ink-faint);text-align:center;padding:24px 0;font-style:italic;}
+
+/* ── MESSAGE BUBBLES ── */
+.msg-card{
+  background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:12px;position:relative;
+}
+.msg-who{font-weight:600;font-size:13px;color:var(--rust);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;}
+.msg-text{font-size:15px;color:var(--ink);line-height:1.55;}
+.msg-time{font-size:11px;color:var(--ink-faint);margin-top:6px;}
+.msg-del{position:absolute;top:10px;right:12px;background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:20px;}
+.msg-del:hover{color:var(--rust);}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:var(--cream);padding:12px 24px;border-radius:40px;
+  font-size:14px;font-weight:500;opacity:0;transition:all .3s;pointer-events:none;z-index:5000;
+  white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ── SCROLLBAR ── */
+.panel::-webkit-scrollbar{width:3px;}
+.panel::-webkit-scrollbar-track{background:transparent;}
+.panel::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- SETUP OVERLAY -->
+<div id="setup-overlay">
+  <h1>🏠 Home Hub Setup</h1>
+  <p>Follow these steps once to connect your home iPad and your phone so they stay in sync in real time.</p>
+
+  <div class="steps">
+    <h3>📋 Step-by-step (takes about 10 minutes)</h3>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <p>Open <a href="https://firebase.google.com" target="_blank">firebase.google.com</a> on your computer or phone. Sign in with a Google account (Gmail is fine).</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <p>Click <strong>Go to Console</strong> → <strong>Add project</strong>. Name it anything (e.g. <em>Home Hub</em>). Disable Google Analytics when asked (you don't need it). Click <strong>Create project</strong>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <p>In the left menu click <strong>Build → Realtime Database</strong> → <strong>Create Database</strong>. Choose any location, then select <strong>Start in test mode</strong> and click <strong>Enable</strong>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <p>Go to <strong>Project Settings</strong> (gear icon top-left) → scroll down to <strong>Your apps</strong> → click the <strong>&lt;/&gt;</strong> (web) icon → register app (any name) → you'll see a block of code. Find these values: <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code>.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <p>Paste each value into the boxes below, then tap <strong>Save &amp; Open App</strong>. Do this on both the iPad and your phone — same values both times.</p>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:520px;">
+    <div class="field"><label>apiKey</label><input id="s-apiKey" placeholder="AIzaSy..."></div>
+    <div class="field"><label>authDomain</label><input id="s-authDomain" placeholder="your-app.firebaseapp.com"></div>
+    <div class="field"><label>databaseURL</label><input id="s-databaseURL" placeholder="https://your-app-default-rtdb.firebaseio.com"></div>
+    <div class="field"><label>projectId</label><input id="s-projectId" placeholder="your-app-id"></div>
+    <button class="go-btn" onclick="saveConfig()">Save &amp; Open App</button>
+  </div>
+</div>
+
+<!-- WAKE SCREEN -->
+<div id="wake-screen" class="hidden" onclick="wakeUp()">
+  <div class="clock" id="wake-clock">00:00</div>
+  <div class="date-str" id="wake-date"></div>
+  <div class="tap-hint">Tap anywhere to start</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+  <header>
+    <span class="header-title">🏠 Home Hub</span>
+    <span class="header-time" id="header-time">
+      <span id="live-time"></span>
+      <span class="conn-dot" id="conn-dot" title="Connection status"></span>
+    </span>
+  </header>
+
+  <div class="tabs">
+    <div class="tab-btn active" onclick="switchTab('cal')" id="tab-cal">
+      <span class="tab-icon">📅</span>Calendar
+    </div>
+    <div class="tab-btn" onclick="switchTab('tasks')" id="tab-tasks">
+      <span class="tab-icon">✅</span>Tasks
+      <span class="badge-count" id="badge-tasks">0</span>
+    </div>
+    <div class="tab-btn" onclick="switchTab('board')" id="tab-board">
+      <span class="tab-icon">💬</span>Board
+      <span class="badge-count" id="badge-board">0</span>
+    </div>
+  </div>
+
+  <div class="panels">
+    <!-- CALENDAR -->
+    <div class="panel active" id="panel-cal">
+      <div class="section-card">
+        <div class="section-body">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+            <span class="cal-month" id="cal-month-label"></span>
+            <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-rust">📅</div>
+          <h2>Add Event</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Title</label><input id="ev-title" type="text" placeholder="e.g. Doctor appointment"></div>
+          <div class="row-fields">
+            <div class="field"><label>Date</label><input id="ev-date" type="date"></div>
+            <div class="field"><label>Time</label><input id="ev-time" type="time"></div>
+          </div>
+          <div class="field"><label>Who</label>
+            <select id="ev-who">
+              <option>Everyone</option>
+              <option>Katarina</option>
+              <option>Stevan</option>
+            </select>
+          </div>
+          <button class="btn btn-rust" onclick="addEvent()">Add to Calendar</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-gold">📋</div>
+          <h2>Upcoming Events</h2>
+        </div>
+        <div class="section-body" id="ev-list"></div>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="panel" id="panel-tasks">
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-sage">➕</div>
+          <h2>Add Task</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Task</label><input id="task-text" type="text" placeholder="e.g. Buy milk"></div>
+          <div class="row-fields">
+            <div class="field"><label>Due date</label><input id="task-due" type="date"></div>
+            <div class="field"><label>For</label>
+              <select id="task-who">
+                <option>Everyone</option>
+                <option>Katarina</option>
+                <option>Stevan</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-sage" onclick="addTask()">Add Task</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-sage">✅</div>
+          <h2>Task List</h2>
+        </div>
+        <div class="section-body" id="task-list"></div>
+      </div>
+    </div>
+
+    <!-- BOARD -->
+    <div class="panel" id="panel-board">
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-head-icon icon-rust">💬</div>
+          <h2>Leave a Message</h2>
+        </div>
+        <div class="section-body">
+          <div class="field"><label>Who's posting?</label>
+            <div class="who-picker">
+              <div class="who-chip sel" onclick="pickWho(this,'Katarina')">Katarina</div>
+              <div class="who-chip" onclick="pickWho(this,'Stevan')">Stevan</div>
+            </div>
+          </div>
+          <div class="field"><label>Message</label><textarea id="msg-text" placeholder="Leave a note for the family…"></textarea></div>
+          <button class="btn btn-rust" onclick="addMessage()">Post Message</button>
+        </div>
+      </div>
+      <div id="msg-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Firebase compat SDK (works on iOS 9 Safari) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+// ── STATE ──
+var db = null;
+var audioCtx = null;
+var audioUnlocked = false;
+var currentWho = 'Katarina';
+var viewYear, viewMonth;
+var knownMsgIds = {};
+var knownTaskIds = {};
+var knownEvIds = {};
+var firstLoad = { events: true, tasks: true, messages: true };
+var unreadMsgs = 0, unreadTasks = 0;
+
+// ── CONFIG ──
+function saveConfig() {
+  var keys = ['apiKey','authDomain','databaseURL','projectId'];
+  var cfg = {};
+  for (var i = 0; i < keys.length; i++) {
+    var val = document.getElementById('s-' + keys[i]).value.trim();
+    if (!val) { alert('Please fill in: ' + keys[i]); return; }
+    cfg[keys[i]] = val;
+  }
+  try { localStorage.setItem('hh_config', JSON.stringify(cfg)); } catch(e) {}
+  startApp(cfg);
+}
+
+function loadConfig() {
+  try {
+    var s = localStorage.getItem('hh_config');
+    if (s) return JSON.parse(s);
+  } catch(e) {}
+  return null;
+}
+
+// ── BOOT ──
+window.onload = function() {
+  var cfg = loadConfig();
+  if (cfg) {
+    startApp(cfg);
+  } else {
+    document.getElementById('setup-overlay').style.display = 'flex';
+  }
+};
+
+function startApp(cfg) {
+  document.getElementById('setup-overlay').classList.add('hidden');
+  setTimeout(function() { document.getElementById('setup-overlay').style.display = 'none'; }, 500);
+
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: cfg.apiKey,
+        authDomain: cfg.authDomain,
+        databaseURL: cfg.databaseURL,
+        projectId: cfg.projectId
+      });
+    }
+    db = firebase.database();
+    document.getElementById('conn-dot').classList.add('online');
+    listenAll();
+  } catch(e) {
+    showToast('Firebase error: ' + e.message);
+  }
+
+  var now = new Date();
+  viewYear = now.getFullYear();
+  viewMonth = now.getMonth();
+
+  var todayStr = now.toISOString().slice(0,10);
+  document.getElementById('ev-date').value = todayStr;
+  document.getElementById('task-due').value = todayStr;
+
+  showWakeScreen();
+  tickClock();
+  setInterval(tickClock, 1000);
+}
+
+// ── WAKE SCREEN ──
+function showWakeScreen() {
+  document.getElementById('wake-screen').classList.remove('hidden');
+  tickWakeClock();
+  setInterval(tickWakeClock, 1000);
+}
+
+function tickWakeClock() {
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes();
+  document.getElementById('wake-clock').textContent =
+    (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('wake-date').textContent =
+    days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()];
+}
+
+function wakeUp() {
+  unlockAudio();
+  document.getElementById('wake-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  renderCal();
+  renderEvents();
+  renderTasks();
+  renderMessages();
+}
+
+// ── CLOCK ──
+function tickClock() {
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes();
+  document.getElementById('live-time').textContent =
+    (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+}
+
+// ── AUDIO ──
+function unlockAudio() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var buf = audioCtx.createBuffer(1, 1, 22050);
+    var src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+    audioUnlocked = true;
+  } catch(e) {}
+}
+
+function beep(type) {
+  if (!audioUnlocked || !audioCtx) return;
+  try {
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    var t = audioCtx.currentTime;
+    if (type === 'add') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(660, t);
+      o.frequency.setValueAtTime(880, t + 0.12);
+      o.frequency.setValueAtTime(1100, t + 0.22);
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.4);
+      o.start(t); o.stop(t + 0.4);
+    } else if (type === 'done') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(440, t);
+      o.frequency.setValueAtTime(554, t + 0.1);
+      o.frequency.setValueAtTime(659, t + 0.2);
+      o.frequency.setValueAtTime(880, t + 0.3);
+      g.gain.setValueAtTime(0.2, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.5);
+      o.start(t); o.stop(t + 0.5);
+    } else if (type === 'notify') {
+      o.type = 'sine';
+      o.frequency.setValueAtTime(880, t);
+      o.frequency.setValueAtTime(1100, t + 0.08);
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.3);
+      o.start(t); o.stop(t + 0.3);
+      var o2 = audioCtx.createOscillator();
+      var g2 = audioCtx.createGain();
+      o2.connect(g2); g2.connect(audioCtx.destination);
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(880, t + 0.35);
+      o2.frequency.setValueAtTime(1100, t + 0.43);
+      g2.gain.setValueAtTime(0.18, t + 0.35);
+      g2.gain.linearRampToValueAtTime(0, t + 0.65);
+      o2.start(t + 0.35); o2.stop(t + 0.65);
+    }
+  } catch(e) {}
+}
+
+// ── TABS ──
+function switchTab(name) {
+  ['cal','tasks','board'].forEach(function(t) {
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+    document.getElementById('panel-' + t).classList.toggle('active', t === name);
+  });
+  if (name === 'board') { unreadMsgs = 0; updateBadge('board', 0); }
+  if (name === 'tasks') { unreadTasks = 0; updateBadge('tasks', 0); }
+}
+
+function updateBadge(which, count) {
+  var el = document.getElementById('badge-' + which);
+  if (count > 0) { el.textContent = count; el.classList.add('show'); }
+  else { el.classList.remove('show'); }
+}
+
+// ── FIREBASE LISTENERS ──
+function listenAll() {
+  if (!db) return;
+
+  db.ref('events').on('child_added', function(snap) {
+    var ev = snap.val(); ev._id = snap.key;
+    if (!firstLoad.events && !knownEvIds[snap.key]) { beep('notify'); showToast('📅 New event: ' + ev.title); }
+    knownEvIds[snap.key] = true;
+    renderEvents(); renderCal();
+  });
+  db.ref('events').on('child_removed', function(snap) {
+    delete knownEvIds[snap.key]; renderEvents(); renderCal();
+  });
+  db.ref('events').once('value', function() { firstLoad.events = false; });
+
+  db.ref('tasks').on('child_added', function(snap) {
+    var t = snap.val();
+    if (!firstLoad.tasks && !knownTaskIds[snap.key]) {
+      beep('notify'); showToast('✅ New task: ' + t.text);
+      unreadTasks++; updateBadge('tasks', unreadTasks);
+    }
+    knownTaskIds[snap.key] = true;
+    renderTasks();
+  });
+  db.ref('tasks').on('child_changed', function() { renderTasks(); });
+  db.ref('tasks').on('child_removed', function(snap) { delete knownTaskIds[snap.key]; renderTasks(); });
+  db.ref('tasks').once('value', function() { firstLoad.tasks = false; });
+
+  db.ref('messages').on('child_added', function(snap) {
+    var m = snap.val();
+    if (!firstLoad.messages && !knownMsgIds[snap.key]) {
+      beep('notify'); showToast('💬 ' + m.who + ': ' + m.text.slice(0,40));
+      unreadMsgs++; updateBadge('board', unreadMsgs);
+    }
+    knownMsgIds[snap.key] = true;
+    renderMessages();
+  });
+  db.ref('messages').on('child_removed', function(snap) { delete knownMsgIds[snap.key]; renderMessages(); });
+  db.ref('messages').once('value', function() { firstLoad.messages = false; });
+}
+
+// ── CALENDAR ──
+var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function changeMonth(d) {
+  viewMonth += d;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  renderCal();
+}
+
+function getEventDates() {
+  var dates = {};
+  if (!db) return dates;
+  db.ref('events').once('value', function(snap) {
+    snap.forEach(function(c) {
+      var e = c.val();
+      if (e.date) {
+        var d = new Date(e.date + 'T00:00:00');
+        if (d.getFullYear() === viewYear && d.getMonth() === viewMonth)
+          dates[d.getDate()] = true;
+      }
+    });
+    renderCalWithDates(dates);
+  });
+  return dates;
+}
+
+function renderCal() {
+  document.getElementById('cal-month-label').textContent = MONTHS[viewMonth] + ' ' + viewYear;
+  if (db) getEventDates();
+  else renderCalWithDates({});
+}
+
+function renderCalWithDates(evDates) {
+  var grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(function(d) {
+    var el = document.createElement('div');
+    el.className = 'cal-dname'; el.textContent = d;
+    grid.appendChild(el);
+  });
+  var first = new Date(viewYear, viewMonth, 1).getDay();
+  var days = new Date(viewYear, viewMonth + 1, 0).getDate();
+  var prevDays = new Date(viewYear, viewMonth, 0).getDate();
+  var today = new Date();
+
+  for (var i = 0; i < first; i++) {
+    var el = document.createElement('div');
+    el.className = 'cal-day other';
+    el.textContent = prevDays - first + 1 + i;
+    grid.appendChild(el);
+  }
+  for (var d = 1; d <= days; d++) {
+    var el = document.createElement('div');
+    var cls = 'cal-day';
+    var isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
+    if (isToday) cls += ' today';
+    if (evDates[d]) cls += ' has-ev';
+    el.className = cls;
+    el.textContent = d;
+    if (evDates[d]) { var dot = document.createElement('div'); dot.className = 'ev-dot'; el.appendChild(dot); }
+    grid.appendChild(el);
+  }
+}
+
+// ── EVENTS ──
+function addEvent() {
+  var title = document.getElementById('ev-title').value.trim();
+  var date = document.getElementById('ev-date').value;
+  if (!title || !date) { showToast('Please fill in title and date'); return; }
+  var ev = {
+    title: title, date: date,
+    time: document.getElementById('ev-time').value,
+    who: document.getElementById('ev-who').value,
+    created: Date.now()
+  };
+  if (db) {
+    db.ref('events').push(ev);
+  }
+  beep('add');
+  document.getElementById('ev-title').value = '';
+  document.getElementById('ev-time').value = '';
+  showToast('Event added!');
+}
+
+function renderEvents() {
+  var list = document.getElementById('ev-list');
+  if (!db) { list.innerHTML = '<p class="empty-msg">Connect to Firebase to see events.</p>'; return; }
+  db.ref('events').orderByChild('date').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) { list.innerHTML = '<p class="empty-msg">No events yet — add one above.</p>'; return; }
+    var today = new Date().toISOString().slice(0, 10);
+    items.forEach(function(ev) {
+      var past = ev.date < today;
+      var row = document.createElement('div'); row.className = 'item';
+      var whoTag = ev.who && ev.who !== 'Everyone' ? '<span class="tag tag-info">' + esc(ev.who) + '</span>' : '';
+      row.innerHTML = '<div class="item-left">'
+        + '<div class="item-title' + (past ? ' done' : '') + '">' + esc(ev.title) + whoTag + '</div>'
+        + '<div class="item-sub">' + esc(ev.date) + (ev.time ? ' at ' + esc(ev.time) : '') + '</div>'
+        + '</div>'
+        + '<button class="item-del" onclick="delEvent(\'' + ev._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(row);
+    });
+  });
+}
+
+function delEvent(id) {
+  if (db) db.ref('events/' + id).remove();
+}
+
+// ── TASKS ──
+function addTask() {
+  var text = document.getElementById('task-text').value.trim();
+  if (!text) { showToast('Please enter a task'); return; }
+  var task = {
+    text: text,
+    due: document.getElementById('task-due').value,
+    who: document.getElementById('task-who').value,
+    done: false,
+    created: Date.now()
+  };
+  if (db) db.ref('tasks').push(task);
+  beep('add');
+  document.getElementById('task-text').value = '';
+  showToast('Task added!');
+}
+
+function toggleTask(id, done) {
+  if (db) {
+    db.ref('tasks/' + id).update({ done: !done });
+    if (!done) beep('done');
+  }
+}
+
+function delTask(id) {
+  if (db) db.ref('tasks/' + id).remove();
+}
+
+function renderTasks() {
+  var list = document.getElementById('task-list');
+  if (!db) { list.innerHTML = '<p class="empty-msg">Connect to Firebase to see tasks.</p>'; return; }
+  db.ref('tasks').orderByChild('created').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) { list.innerHTML = '<p class="empty-msg">No tasks yet — add one above.</p>'; return; }
+    var today = new Date().toISOString().slice(0, 10);
+    // undone first, then done
+    items.sort(function(a, b) { return (a.done === b.done) ? 0 : a.done ? 1 : -1; });
+    items.forEach(function(task) {
+      var row = document.createElement('div'); row.className = 'item';
+      var overdue = task.due && task.due < today && !task.done;
+      var dueTag = task.due ? '<span class="tag ' + (overdue ? 'tag-warn' : 'tag-ok') + '">' + (overdue ? 'Overdue' : esc(task.due)) + '</span>' : '';
+      var whoTag = task.who && task.who !== 'Everyone' ? '<span class="tag tag-info">' + esc(task.who) + '</span>' : '';
+      row.innerHTML = '<div class="check-ring' + (task.done ? ' done' : '') + '" onclick="toggleTask(\'' + task._id + '\',' + task.done + ')" role="checkbox" aria-checked="' + task.done + '" tabindex="0">'
+        + '<svg width="12" height="10" viewBox="0 0 12 10" fill="none"><polyline points="1,5 4,8 11,1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '</div>'
+        + '<div class="item-left"><div class="item-title' + (task.done ? ' done' : '') + '">' + esc(task.text) + whoTag + '</div>'
+        + '<div class="item-sub">' + dueTag + '</div></div>'
+        + '<button class="item-del" onclick="delTask(\'' + task._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(row);
+    });
+  });
+}
+
+// ── MESSAGES ──
+function pickWho(el, name) {
+  document.querySelectorAll('.who-chip').forEach(function(c) { c.classList.remove('sel'); });
+  el.classList.add('sel');
+  currentWho = name;
+}
+
+function addMessage() {
+  var text = document.getElementById('msg-text').value.trim();
+  if (!text) { showToast('Please write a message'); return; }
+  var now = new Date();
+  var msg = {
+    who: currentWho, text: text,
+    time: now.toLocaleDateString('en-GB', {day:'numeric',month:'short'}) + ' ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+    created: Date.now()
+  };
+  if (db) db.ref('messages').push(msg);
+  beep('add');
+  document.getElementById('msg-text').value = '';
+  showToast('Message posted!');
+}
+
+function delMsg(id) {
+  if (db) db.ref('messages/' + id).remove();
+}
+
+function renderMessages() {
+  var list = document.getElementById('msg-list');
+  if (!db) { list.innerHTML = '<div class="section-card"><div class="section-body"><p class="empty-msg">Connect to Firebase to see messages.</p></div></div>'; return; }
+  db.ref('messages').orderByChild('created').once('value', function(snap) {
+    list.innerHTML = '';
+    var items = [];
+    snap.forEach(function(c) { var v = c.val(); v._id = c.key; items.push(v); });
+    if (!items.length) {
+      list.innerHTML = '<div class="section-card"><div class="section-body"><p class="empty-msg">No messages yet — be the first!</p></div></div>';
+      return;
+    }
+    items.reverse().forEach(function(m) {
+      var card = document.createElement('div'); card.className = 'msg-card';
+      card.innerHTML = '<div class="msg-who">' + esc(m.who) + '</div>'
+        + '<div class="msg-text">' + esc(m.text) + '</div>'
+        + '<div class="msg-time">' + esc(m.time) + '</div>'
+        + '<button class="msg-del" onclick="delMsg(\'' + m._id + '\')" aria-label="Delete">×</button>';
+      list.appendChild(card);
+    });
+  });
+}
+
+// ── TOAST ──
+var toastTimer;
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2800);
+}
+
+// ── UTIL ──
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
