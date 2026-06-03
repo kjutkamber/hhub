@@ -486,6 +486,14 @@ var knownEvIds = {};
 var firstLoad = { events: true, tasks: true, messages: true };
 var unreadMsgs = 0, unreadTasks = 0;
 
+// ── HARDCODED CONFIG ──
+var HARDCODED_CONFIG = {
+  apiKey: "AIzaSyDxr1KYGbAM4CcPh-lUYYXlUbazxqGK05A",
+  authDomain: "home-hub-39fa1.firebaseapp.com",
+  databaseURL: "https://home-hub-39fa1-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "home-hub-39fa1"
+};
+
 // ── CONFIG ──
 function saveConfig() {
   var keys = ['apiKey','authDomain','databaseURL','projectId'];
@@ -500,6 +508,9 @@ function saveConfig() {
 }
 
 function loadConfig() {
+  if (HARDCODED_CONFIG && HARDCODED_CONFIG.apiKey) {
+    return HARDCODED_CONFIG;
+  }
   try {
     var s = localStorage.getItem('hh_config');
     if (s) return JSON.parse(s);
@@ -600,11 +611,11 @@ function unlockAudio() {
 function beep(type) {
   if (!audioUnlocked || !audioCtx) return;
   try {
-    var o = audioCtx.createOscillator();
-    var g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
     var t = audioCtx.currentTime;
     if (type === 'add') {
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
       o.type = 'sine';
       o.frequency.setValueAtTime(660, t);
       o.frequency.setValueAtTime(880, t + 0.12);
@@ -613,6 +624,9 @@ function beep(type) {
       g.gain.linearRampToValueAtTime(0, t + 0.4);
       o.start(t); o.stop(t + 0.4);
     } else if (type === 'done') {
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
       o.type = 'sine';
       o.frequency.setValueAtTime(440, t);
       o.frequency.setValueAtTime(554, t + 0.1);
@@ -622,21 +636,33 @@ function beep(type) {
       g.gain.linearRampToValueAtTime(0, t + 0.5);
       o.start(t); o.stop(t + 0.5);
     } else if (type === 'notify') {
-      o.type = 'sine';
-      o.frequency.setValueAtTime(880, t);
-      o.frequency.setValueAtTime(1100, t + 0.08);
-      g.gain.setValueAtTime(0.18, t);
-      g.gain.linearRampToValueAtTime(0, t + 0.3);
-      o.start(t); o.stop(t + 0.3);
-      var o2 = audioCtx.createOscillator();
-      var g2 = audioCtx.createGain();
-      o2.connect(g2); g2.connect(audioCtx.destination);
-      o2.type = 'sine';
-      o2.frequency.setValueAtTime(880, t + 0.35);
-      o2.frequency.setValueAtTime(1100, t + 0.43);
-      g2.gain.setValueAtTime(0.18, t + 0.35);
-      g2.gain.linearRampToValueAtTime(0, t + 0.65);
-      o2.start(t + 0.35); o2.stop(t + 0.65);
+      // Plays a dynamic double-tone chime sequence that repeats 4 times over ~3.0 seconds
+      var repetitions = 4;
+      var spacing = 0.75; // Total time of 3 seconds divided into 4 intervals
+      
+      for (var i = 0; i < repetitions; i++) {
+        var startTime = t + (i * spacing);
+        
+        var o1 = audioCtx.createOscillator();
+        var g1 = audioCtx.createGain();
+        o1.connect(g1); g1.connect(audioCtx.destination);
+        o1.type = 'sine';
+        o1.frequency.setValueAtTime(880, startTime);
+        o1.frequency.setValueAtTime(1100, startTime + 0.08);
+        g1.gain.setValueAtTime(0.18, startTime);
+        g1.gain.linearRampToValueAtTime(0, startTime + 0.3);
+        o1.start(startTime); o1.stop(startTime + 0.3);
+
+        var o2 = audioCtx.createOscillator();
+        var g2 = audioCtx.createGain();
+        o2.connect(g2); g2.connect(audioCtx.destination);
+        o2.type = 'sine';
+        o2.frequency.setValueAtTime(880, startTime + 0.35);
+        o2.frequency.setValueAtTime(1100, startTime + 0.43);
+        g2.gain.setValueAtTime(0.18, startTime + 0.35);
+        g2.gain.linearRampToValueAtTime(0, startTime + 0.65);
+        o2.start(startTime + 0.35); o2.stop(startTime + 0.65);
+      }
     }
   } catch(e) {}
 }
@@ -783,7 +809,6 @@ function addEvent() {
   showToast('Event added!');
 }
 
-// Modernized Dynamic Elements Inside Render Injection
 function renderEvents() {
   var list = document.getElementById('ev-list');
   if (!db) { list.innerHTML = '<p class="empty-msg">Connect to Firebase to see events.</p>'; return; }
@@ -807,11 +832,11 @@ function renderEvents() {
   });
 }
 
+// ── TASKS ──
 function delEvent(id) {
   if (db) db.ref('events/' + id).remove();
 }
 
-// ── TASKS ──
 function addTask() {
   var text = document.getElementById('task-text').value.trim();
   if (!text) { showToast('Please enter a task'); return; }
