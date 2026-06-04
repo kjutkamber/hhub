@@ -463,23 +463,25 @@
             -webkit-transform: translateZ(0);
             transform: translateZ(0);
         }
-        .sticky-note.peeking {
-            left: -135px !important; /* Pushed out frame bounding parameters */
+        /* Hidden state: note spawns invisible at centre, tap to reveal */
+        .sticky-note.note-hidden {
+            opacity: 0;
             cursor: pointer;
-            box-shadow: 4px 4px 0px #000;
+            -webkit-transform: scale(0.5);
+            transform: scale(0.5);
+            -webkit-transition: opacity 0.25s ease, -webkit-transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .sticky-note.peeking .window-bar, .sticky-note.peeking .note-body, .sticky-note.peeking .note-meta {
-            opacity: 0.2;
-        }
-        /* Reveal a colored click edge tab visually on peeking item entries */
-        .sticky-note.peeking::after {
-            content: "➔";
+        /* Pulse ring to hint that something is waiting */
+        .sticky-note.note-hidden::after {
+            content: "✉";
             position: absolute;
-            right: 6px;
-            top: 40%;
-            font-size: 18px;
-            color: #000;
-            font-weight: 900;
+            top: 50%;
+            left: 50%;
+            -webkit-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            opacity: 1;
         }
         
         .note-color-1 { background: #FF9F43; }
@@ -590,12 +592,9 @@
         <div class="setup-box brutal-block" style="max-width:520px; width:92%;">
             <div class="window-bar"><div class="window-dots"><div class="window-dot"></div><div class="window-dot d2"></div><div class="window-dot d3"></div></div>FIREBASE CONNECT</div>
             <div style="padding:20px; background:#FFF;">
-                <p style="font-size:12px; text-transform:uppercase; margin-bottom:16px;">Enter your Firebase project credentials:</p>
-                <div class="form-field"><label>API Key</label><input type="text" id="fb-apiKey" placeholder="AIzaSy..."></div>
-                <div class="form-field"><label>Auth Domain</label><input type="text" id="fb-authDomain" placeholder="yourapp.firebaseapp.com"></div>
-                <div class="form-field"><label>Database URL</label><input type="text" id="fb-databaseURL" placeholder="https://yourapp-default-rtdb.firebaseio.com"></div>
-                <div class="form-field"><label>Project ID</label><input type="text" id="fb-projectId" placeholder="yourapp"></div>
-                <button class="brutal-btn" style="width:100%; padding:14px; margin-top:8px;" onclick="processSetupString()">CONNECT</button>
+                <p style="font-size:12px; text-transform:uppercase; margin-bottom:10px;">Paste your Firebase credentials block:</p>
+                <textarea id="fb-credentials-block" style="width:100%; height:160px; border:3px solid #000; padding:10px; font-size:13px; font-family:monospace; resize:none; outline:none; background:#f9f9f9;" placeholder="API Key&#10;AIzaSy...&#10;Auth Domain&#10;yourapp.firebaseapp.com&#10;Database URL&#10;https://yourapp-default-rtdb.firebaseio.com&#10;Project ID&#10;yourapp"></textarea>
+                <button class="brutal-btn" style="width:100%; padding:14px; margin-top:10px;" onclick="processSetupString()">CONNECT</button>
             </div>
         </div>
     </div>
@@ -746,15 +745,25 @@
         };
 
         function processSetupString() {
+            var raw = document.getElementById('fb-credentials-block').value;
+
+            // Parse the label+value block format (handles backtick-wrapped values too)
+            function extractField(label) {
+                // Match label then capture the value on same or next line, strip backticks
+                var re = new RegExp(label + '[\s\S]*?`?([^`\n\r]+)`?', 'i');
+                var m = raw.match(re);
+                return m ? m[1].trim().replace(/`/g, '') : '';
+            }
+
             var config = {
-                apiKey:      document.getElementById('fb-apiKey').value.trim(),
-                authDomain:  document.getElementById('fb-authDomain').value.trim(),
-                databaseURL: document.getElementById('fb-databaseURL').value.trim(),
-                projectId:   document.getElementById('fb-projectId').value.trim()
+                apiKey:      extractField('API Key'),
+                authDomain:  extractField('Auth Domain'),
+                databaseURL: extractField('Database URL'),
+                projectId:   extractField('Project ID')
             };
 
             if (!config.apiKey || !config.databaseURL) {
-                return alert("API Key and Database URL are required.");
+                return alert("Could not find API Key and Database URL in the pasted text. Make sure you copied the full block.");
             }
 
             localStorage.setItem('family_hub_config', JSON.stringify(config));
@@ -870,19 +879,27 @@
             document.getElementById('btn-' + tabName).className = 'tab-btn active';
         }
 
+        var audioUnlocked = false;
+
         function unlockAudioChannel() {
-            document.getElementById('sound-added').play();
-            document.getElementById('sound-added').pause();
-            document.getElementById('sound-completed').play();
-            document.getElementById('sound-completed').pause();
-            document.getElementById('sound-message').play();
-            document.getElementById('sound-message').pause();
-            document.getElementById('sound-alert').play();
-            document.getElementById('sound-alert').pause();
-            
+            var sounds = ['sound-added','sound-completed','sound-message','sound-alert'];
+            for (var s = 0; s < sounds.length; s++) {
+                var el = document.getElementById(sounds[s]);
+                el.play();
+                el.pause();
+                el.currentTime = 0;
+            }
+            audioUnlocked = true;
             var btn = document.getElementById('audio-lock-btn');
             btn.style.background = '#6BCB77';
             btn.innerHTML = "🔊 CORE SOUNDS READY";
+        }
+
+        function safePlay(soundId) {
+            if (!audioUnlocked) return;
+            var el = document.getElementById(soundId);
+            el.currentTime = 0;
+            el.play();
         }
 
         /* --- REMOTE ADDITION ALERT ENGINE (HOME HUB ONLY) --- */
@@ -938,9 +955,9 @@
 
             // Start repeating sound every 4 seconds
             if (!remoteAlertInterval) {
-                document.getElementById('sound-alert').play();
+                safePlay('sound-alert');
                 remoteAlertInterval = setInterval(function() {
-                    document.getElementById('sound-alert').play();
+                    safePlay('sound-alert');
                 }, 4000);
             }
         }
@@ -1060,7 +1077,7 @@
                 calendarEvents.push(newEvent);
                 renderFunctionalCalendar();
             }
-            document.getElementById('sound-added').play();
+            safePlay('sound-added');
         }
 
         function deleteCalendarEvent(eventId, eventObj) {
@@ -1077,7 +1094,7 @@
             if (db) {
                 db.ref('calendarEvents/' + eventId).remove();
             }
-            document.getElementById('sound-completed').play();
+            safePlay('sound-completed');
         }
 
         /* --- CHECKLIST TRACK ENGINE --- */
@@ -1089,13 +1106,22 @@
                 var task = taskItems[i];
                 var li = document.createElement('li');
                 li.className = 'task-item';
-                
+
                 var checkedState = task.completed ? 'checked' : '';
                 var textClass = task.completed ? 'task-text completed' : 'task-text';
+                // Store id as data attribute to avoid large-number JS parsing issues on iOS
+                li.setAttribute('data-task-id', String(task.id));
 
-                li.innerHTML = '<input type="checkbox" class="task-checkbox" ' + checkedState + ' onchange="toggleTask(' + task.id + ')">' +
+                li.innerHTML = '<input type="checkbox" class="task-checkbox" ' + checkedState + '>' +
                                '<span class="' + textClass + '">' + task.text + '</span>' +
-                               '<button class="task-del-btn" onclick="deleteTask(' + task.id + ')">DELETE</button>';
+                               '<button class="task-del-btn">DELETE</button>';
+
+                // Attach events via JS (not inline) so IDs are always treated as strings
+                (function(taskObj, liEl) {
+                    liEl.querySelector('.task-checkbox').onchange = function() { toggleTask(String(taskObj.id)); };
+                    liEl.querySelector('.task-del-btn').onclick   = function() { deleteTask(String(taskObj.id)); };
+                })(task, li);
+
                 listAnchor.appendChild(li);
             }
         }
@@ -1105,56 +1131,56 @@
             if (input.value.trim() === "") return;
 
             var newTask = {
-                id: new Date().getTime(),
+                id: String(new Date().getTime()),  // always string
                 text: input.value,
-                completed: false
+                completed: false,
+                addedBy: currentUser || 'unknown'
             };
 
-            newTask.addedBy = currentUser;
             input.value = "";
             if (db) {
+                // Firebase is source of truth; listener will re-render
                 db.ref('tasks/' + newTask.id).set(newTask);
             } else {
                 taskItems.push(newTask);
                 renderTasks();
             }
-            document.getElementById('sound-added').play();
+            safePlay('sound-added');
         }
 
         function toggleTask(taskId) {
-            for (var i = 0; i < taskItems.length; i++) {
-                if (taskItems[i].id === taskId) {
-                    taskItems[i].completed = !taskItems[i].completed;
-                    if (taskItems[i].completed) {
-                        document.getElementById('sound-completed').play();
-                    }
-                    break;
-                }
-            }
             if (db) {
-                for (var k = 0; k < taskItems.length; k++) {
-                    if (taskItems[k].id === taskId) {
-                        db.ref('tasks/' + taskId + '/completed').set(taskItems[k].completed);
+                // Read current value, flip it, write back
+                db.ref('tasks/' + taskId + '/completed').once('value', function(snap) {
+                    var current = snap.val() || false;
+                    db.ref('tasks/' + taskId + '/completed').set(!current);
+                    if (!current) safePlay('sound-completed');
+                });
+            } else {
+                for (var i = 0; i < taskItems.length; i++) {
+                    if (String(taskItems[i].id) === taskId) {
+                        taskItems[i].completed = !taskItems[i].completed;
+                        if (taskItems[i].completed) safePlay('sound-completed');
                         break;
                     }
                 }
+                renderTasks();
             }
-            renderTasks();
         }
 
         function deleteTask(taskId) {
-            var filtered = [];
-            for (var i = 0; i < taskItems.length; i++) {
-                if (taskItems[i].id !== taskId) {
-                    filtered.push(taskItems[i]);
-                }
-            }
-            taskItems = filtered;
-            renderTasks();
             if (db) {
+                // Firebase listener handles re-render; don't touch local array
                 db.ref('tasks/' + taskId).remove();
+            } else {
+                var filtered = [];
+                for (var i = 0; i < taskItems.length; i++) {
+                    if (String(taskItems[i].id) !== taskId) filtered.push(taskItems[i]);
+                }
+                taskItems = filtered;
+                renderTasks();
             }
-            document.getElementById('sound-completed').play();
+            safePlay('sound-completed');
         }
 
         /* --- PEEKING STICKY NOTE HANDLERS --- */
@@ -1175,7 +1201,7 @@
                 color: randomColorIndex,
                 left: 0, // Starts aligned completely over peeking track structures
                 top: randomTop,
-                peeking: true
+                hidden: true
             };
 
             textarea.value = "";
@@ -1186,16 +1212,27 @@
                 stickyNotes.push(noteObj);
                 spawnStickyDOMNode(noteObj);
             }
-            document.getElementById('sound-message').play();
+            safePlay('sound-message');
         }
 
         function spawnStickyDOMNode(note) {
+            var board = document.getElementById('bulletin-view');
+            var bw = board.offsetWidth  || window.innerWidth;
+            var bh = board.offsetHeight || window.innerHeight;
+            var noteW = 160;
+            var noteH = 160;
+
+            // Centre of board, with a little random scatter so notes don't stack perfectly
+            var centreLeft = Math.round((bw - noteW) / 2) + Math.floor(Math.random() * 60) - 30;
+            var centreTop  = Math.round((bh - noteH) / 2) + Math.floor(Math.random() * 60) - 30;
+
             var div = document.createElement('div');
-            div.className = 'sticky-note peeking note-color-' + note.color;
+            // Start invisible at centre; no peeking class — hidden via opacity instead
+            div.className = 'sticky-note note-hidden note-color-' + note.color;
             div.id = "sticky-node-id-" + note.id;
-            div.style.left = '0px';
-            div.style.top = note.top + 'px';
-            
+            div.style.left = centreLeft + 'px';
+            div.style.top  = centreTop  + 'px';
+
             div.setAttribute('ontouchstart', 'initDrag(event)');
             div.setAttribute('onmousedown', 'initDrag(event)');
             div.setAttribute('onclick', 'handleStickyClick(event)');
@@ -1203,27 +1240,16 @@
             div.innerHTML = '<div class="window-bar"><div class="window-dots"><div class="window-dot"></div></div>MEMO</div>' +
                             '<div class="note-body">' + note.text + '</div>' +
                             '<div class="note-meta">' + note.author + '</div>';
-            
-            document.getElementById('bulletin-view').appendChild(div);
+
+            board.appendChild(div);
         }
 
         function handleStickyClick(e) {
             var element = e.currentTarget;
-            if (element.className.indexOf('peeking') !== -1) {
-                // Clear out peeking lock state array properties instantly to release item tracking
-                element.className = element.className.replace(' peeking', '');
-                element.style.left = '160px'; // Pops cleanly out onto canvas view track matrices
-                
-                var elementIdString = element.id.replace("sticky-node-id-", "");
-                var numericId = parseInt(elementIdString);
-                for (var i = 0; i < stickyNotes.length; i++) {
-                    if (stickyNotes[i].id === numericId) {
-                        stickyNotes[i].peeking = false;
-                        stickyNotes[i].left = 160;
-                        break;
-                    }
-                }
-                document.getElementById('sound-message').play();
+            if (element.className.indexOf('note-hidden') !== -1) {
+                // Reveal the note in place with a pop animation
+                element.className = element.className.replace(' note-hidden', '').replace('note-hidden', '');
+                safePlay('sound-message');
             }
         }
 
@@ -1301,7 +1327,7 @@
                     db.ref('stickyNotes/' + numericId).remove();
                 }
                 activeDragElement.parentNode.removeChild(activeDragElement);
-                document.getElementById('sound-completed').play();
+                safePlay('sound-completed');
             } else {
                 activeDragElement.style.zIndex = 10;
                 // Re-apply pop structural cubic motion animation matrices safely back
