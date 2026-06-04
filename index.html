@@ -564,7 +564,7 @@
     </style>
     <!-- FIREBASE SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
@@ -593,10 +593,8 @@
                 <p style="font-size:12px; text-transform:uppercase; margin-bottom:16px;">Enter your Firebase project credentials:</p>
                 <div class="form-field"><label>API Key</label><input type="text" id="fb-apiKey" placeholder="AIzaSy..."></div>
                 <div class="form-field"><label>Auth Domain</label><input type="text" id="fb-authDomain" placeholder="yourapp.firebaseapp.com"></div>
+                <div class="form-field"><label>Database URL</label><input type="text" id="fb-databaseURL" placeholder="https://yourapp-default-rtdb.firebaseio.com"></div>
                 <div class="form-field"><label>Project ID</label><input type="text" id="fb-projectId" placeholder="yourapp"></div>
-                <div class="form-field"><label>Storage Bucket</label><input type="text" id="fb-storageBucket" placeholder="yourapp.appspot.com"></div>
-                <div class="form-field"><label>Messaging Sender ID</label><input type="text" id="fb-messagingSenderId" placeholder="123456789"></div>
-                <div class="form-field"><label>App ID</label><input type="text" id="fb-appId" placeholder="1:123:web:abc..."></div>
                 <button class="brutal-btn" style="width:100%; padding:14px; margin-top:8px;" onclick="processSetupString()">CONNECT</button>
             </div>
         </div>
@@ -732,7 +730,7 @@
         var currentYear = currentDateTime.getFullYear();
         var currentMonth = currentDateTime.getMonth();
 
-        var db = null; // Firestore instance, set after credentials entered
+        var db = null; // Firebase Realtime Database instance, set after credentials entered
 
         window.onload = function() {
             var cachedUser = localStorage.getItem('family_hub_user');
@@ -749,16 +747,14 @@
 
         function processSetupString() {
             var config = {
-                apiKey:            document.getElementById('fb-apiKey').value.trim(),
-                authDomain:        document.getElementById('fb-authDomain').value.trim(),
-                projectId:         document.getElementById('fb-projectId').value.trim(),
-                storageBucket:     document.getElementById('fb-storageBucket').value.trim(),
-                messagingSenderId: document.getElementById('fb-messagingSenderId').value.trim(),
-                appId:             document.getElementById('fb-appId').value.trim()
+                apiKey:      document.getElementById('fb-apiKey').value.trim(),
+                authDomain:  document.getElementById('fb-authDomain').value.trim(),
+                databaseURL: document.getElementById('fb-databaseURL').value.trim(),
+                projectId:   document.getElementById('fb-projectId').value.trim()
             };
 
-            if (!config.apiKey || !config.projectId) {
-                return alert("API Key and Project ID are required.");
+            if (!config.apiKey || !config.databaseURL) {
+                return alert("API Key and Database URL are required.");
             }
 
             localStorage.setItem('family_hub_config', JSON.stringify(config));
@@ -773,85 +769,72 @@
                 if (!firebase.apps.length) {
                     firebase.initializeApp(config);
                 }
-                db = firebase.firestore();
+                db = firebase.database();
                 renderFunctionalCalendar();
-                startFirestoreListeners();
+                startRTDBListeners();
             } catch(e) {
                 alert("Firebase connection failed: " + e.message);
             }
         }
 
-        // Real-time listeners — replace the localStorage poll for actual sync
-        function startFirestoreListeners() {
+        var _loaded = { events: false, tasks: false, notes: false };
+
+        function startRTDBListeners() {
             // Calendar events
-            db.collection('calendarEvents').onSnapshot(function(snapshot) {
+            db.ref('calendarEvents').on('value', function(snapshot) {
+                var data = snapshot.val() || {};
                 calendarEvents = [];
-                snapshot.forEach(function(doc) {
-                    calendarEvents.push(doc.data());
-                });
+                for (var key in data) { calendarEvents.push(data[key]); }
                 renderFunctionalCalendar();
-                checkRemoteAlert('event');
+                if (_loaded.events) {
+                    checkRemoteAlert('event');
+                } else {
+                    _loaded.events = true;
+                }
             });
 
             // Tasks
-            db.collection('tasks').onSnapshot(function(snapshot) {
+            db.ref('tasks').on('value', function(snapshot) {
+                var data = snapshot.val() || {};
                 taskItems = [];
-                snapshot.forEach(function(doc) {
-                    taskItems.push(doc.data());
-                });
+                for (var key in data) { taskItems.push(data[key]); }
                 renderTasks();
-                checkRemoteAlert('task');
+                if (_loaded.tasks) {
+                    checkRemoteAlert('task');
+                } else {
+                    _loaded.tasks = true;
+                }
             });
 
             // Sticky notes
-            db.collection('stickyNotes').onSnapshot(function(snapshot) {
-                var incoming = [];
-                snapshot.forEach(function(doc) {
-                    incoming.push(doc.data());
-                });
-                // Only spawn DOM nodes for new notes not already on board
-                for (var i = 0; i < incoming.length; i++) {
-                    var found = false;
-                    for (var j = 0; j < stickyNotes.length; j++) {
-                        if (stickyNotes[j].id === incoming[i].id) { found = true; break; }
-                    }
-                    if (!found) spawnStickyDOMNode(incoming[i]);
+            db.ref('stickyNotes').on('child_added', function(snapshot) {
+                var note = snapshot.val();
+                var found = false;
+                for (var i = 0; i < stickyNotes.length; i++) {
+                    if (stickyNotes[i].id === note.id) { found = true; break; }
                 }
-                stickyNotes = incoming;
-                checkRemoteAlert('note');
+                if (!found) {
+                    stickyNotes.push(note);
+                    spawnStickyDOMNode(note);
+                    if (_loaded.notes) checkRemoteAlert('note', note);
+                }
+            });
+
+            db.ref('stickyNotes').once('value', function() {
+                _loaded.notes = true;
             });
         }
 
-        var _initEventCount = -1;
-        var _initTaskCount  = -1;
-        var _initNoteCount  = -1;
-
-        function checkRemoteAlert(type) {
-            // Skip alert on the very first load (baseline snapshot)
+        function checkRemoteAlert(type, item) {
+            if (currentUser !== 'Home Hub') return;
             if (type === 'event') {
-                if (_initEventCount === -1) { _initEventCount = calendarEvents.length; return; }
-                if (calendarEvents.length > _initEventCount) {
-                    var last = calendarEvents[calendarEvents.length - 1];
-                    if (last && last.author !== currentUser && currentUser === 'Home Hub') {
-                        triggerRemoteAlert(last.author);
-                    }
-                    _initEventCount = calendarEvents.length;
-                }
+                var last = calendarEvents[calendarEvents.length - 1];
+                if (last && last.addedBy && last.addedBy !== 'Home Hub') triggerRemoteAlert(last.addedBy);
             } else if (type === 'task') {
-                if (_initTaskCount === -1) { _initTaskCount = taskItems.length; return; }
-                if (taskItems.length > _initTaskCount) {
-                    if (currentUser === 'Home Hub') triggerRemoteAlert('another device');
-                    _initTaskCount = taskItems.length;
-                }
-            } else if (type === 'note') {
-                if (_initNoteCount === -1) { _initNoteCount = stickyNotes.length; return; }
-                if (stickyNotes.length > _initNoteCount) {
-                    var lastNote = stickyNotes[stickyNotes.length - 1];
-                    if (lastNote && lastNote.author !== currentUser && currentUser === 'Home Hub') {
-                        triggerRemoteAlert(lastNote.author);
-                    }
-                    _initNoteCount = stickyNotes.length;
-                }
+                var lastT = taskItems[taskItems.length - 1];
+                if (lastT && lastT.addedBy && lastT.addedBy !== 'Home Hub') triggerRemoteAlert(lastT.addedBy);
+            } else if (type === 'note' && item) {
+                if (item.author && item.author !== 'Home Hub') triggerRemoteAlert(item.author);
             }
         }
 
@@ -1069,9 +1052,10 @@
                 author: authorSelect.value
             };
 
+            newEvent.addedBy = currentUser;
             titleInput.value = "";
             if (db) {
-                db.collection('calendarEvents').doc(String(newEvent.id)).set(newEvent);
+                db.ref('calendarEvents/' + newEvent.id).set(newEvent);
             } else {
                 calendarEvents.push(newEvent);
                 renderFunctionalCalendar();
@@ -1091,7 +1075,7 @@
             calendarEvents = filteredArray;
             renderFunctionalCalendar();
             if (db) {
-                db.collection('calendarEvents').doc(String(eventId)).delete();
+                db.ref('calendarEvents/' + eventId).remove();
             }
             document.getElementById('sound-completed').play();
         }
@@ -1126,9 +1110,10 @@
                 completed: false
             };
 
+            newTask.addedBy = currentUser;
             input.value = "";
             if (db) {
-                db.collection('tasks').doc(String(newTask.id)).set(newTask);
+                db.ref('tasks/' + newTask.id).set(newTask);
             } else {
                 taskItems.push(newTask);
                 renderTasks();
@@ -1147,11 +1132,9 @@
                 }
             }
             if (db) {
-                db.collection('tasks').doc(String(taskId)).set(taskItems[i < taskItems.length ? i : 0]);
-                // re-fetch handled by listener; just update local and re-render
                 for (var k = 0; k < taskItems.length; k++) {
                     if (taskItems[k].id === taskId) {
-                        db.collection('tasks').doc(String(taskId)).update({completed: taskItems[k].completed});
+                        db.ref('tasks/' + taskId + '/completed').set(taskItems[k].completed);
                         break;
                     }
                 }
@@ -1169,7 +1152,7 @@
             taskItems = filtered;
             renderTasks();
             if (db) {
-                db.collection('tasks').doc(String(taskId)).delete();
+                db.ref('tasks/' + taskId).remove();
             }
             document.getElementById('sound-completed').play();
         }
@@ -1197,9 +1180,8 @@
 
             textarea.value = "";
             if (db) {
-                db.collection('stickyNotes').doc(String(noteObj.id)).set(noteObj);
-                stickyNotes.push(noteObj);
-                spawnStickyDOMNode(noteObj);
+                db.ref('stickyNotes/' + noteObj.id).set(noteObj);
+                // DOM spawn handled by child_added listener
             } else {
                 stickyNotes.push(noteObj);
                 spawnStickyDOMNode(noteObj);
@@ -1316,7 +1298,7 @@
                 stickyNotes = filteredNotes;
 
                 if (db) {
-                    db.collection('stickyNotes').doc(String(numericId)).delete();
+                    db.ref('stickyNotes/' + numericId).remove();
                 }
                 activeDragElement.parentNode.removeChild(activeDragElement);
                 document.getElementById('sound-completed').play();
