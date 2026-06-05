@@ -700,10 +700,6 @@
     </div>
 
     <!-- SYSTEM CORE AUDIO TRANSLATOR FILE ASSETS -->
-    <audio id="sound-added" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-84.wav" preload="auto"></audio>
-    <audio id="sound-completed" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-84.wav" preload="auto"></audio>
-    <audio id="sound-message" src="https://assets.mixkit.co/active_storage/sfx/1355/1355-84.wav" preload="auto"></audio>
-    <audio id="sound-alert" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav" preload="auto"></audio>
 
     <!-- CORE DESKTOP LOGIC ENGINE - VERIFIED RETRO ES5 INFRASTRUCTURE -->
     <script>
@@ -822,22 +818,33 @@
                 }
             });
 
-            // Sticky notes
-            db.ref('stickyNotes').on('child_added', function(snapshot) {
-                var note = snapshot.val();
-                var found = false;
-                for (var i = 0; i < stickyNotes.length; i++) {
-                    if (stickyNotes[i].id === note.id) { found = true; break; }
+            // Sticky notes — load all first, then watch for new ones
+            db.ref('stickyNotes').once('value', function(snapshot) {
+                var data = snapshot.val() || {};
+                // Clear board and re-spawn all existing notes
+                var board = document.getElementById('bulletin-view');
+                var existing = board.querySelectorAll('.sticky-note');
+                for (var e = 0; e < existing.length; e++) { board.removeChild(existing[e]); }
+                stickyNotes = [];
+                for (var key in data) {
+                    stickyNotes.push(data[key]);
+                    spawnStickyDOMNode(data[key]);
                 }
-                if (!found) {
-                    stickyNotes.push(note);
-                    spawnStickyDOMNode(note);
-                    if (_loaded.notes) checkRemoteAlert('note', note);
-                }
-            });
-
-            db.ref('stickyNotes').once('value', function() {
                 _loaded.notes = true;
+
+                // Now watch for new additions
+                db.ref('stickyNotes').on('child_added', function(snap) {
+                    var note = snap.val();
+                    var found = false;
+                    for (var i = 0; i < stickyNotes.length; i++) {
+                        if (String(stickyNotes[i].id) === String(note.id)) { found = true; break; }
+                    }
+                    if (!found) {
+                        stickyNotes.push(note);
+                        spawnStickyDOMNode(note);
+                        if (_loaded.notes) checkRemoteAlert('note', note);
+                    }
+                });
             });
         }
 
@@ -886,27 +893,72 @@
             document.getElementById('btn-' + tabName).className = 'tab-btn active';
         }
 
+        var audioCtx = null;
         var audioUnlocked = false;
+        var chimeInterval = null;
 
-        function unlockAudioChannel() {
-            var sounds = ['sound-added','sound-completed','sound-message','sound-alert'];
-            for (var s = 0; s < sounds.length; s++) {
-                var el = document.getElementById(sounds[s]);
-                el.play();
-                el.pause();
-                el.currentTime = 0;
+        function getAudioCtx() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-            audioUnlocked = true;
-            var btn = document.getElementById('audio-lock-btn');
-            btn.style.background = '#6BCB77';
-            btn.innerHTML = "🔊 CORE SOUNDS READY";
+            return audioCtx;
+        }
+
+        // Play a simple chime: freq Hz, duration seconds
+        function playBeep(freq, duration, volume) {
+            try {
+                var ctx = getAudioCtx();
+                if (ctx.state === 'suspended') ctx.resume();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq || 880;
+                gain.gain.setValueAtTime(volume || 0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (duration || 0.4));
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + (duration || 0.4));
+            } catch(e) {}
         }
 
         function safePlay(soundId) {
             if (!audioUnlocked) return;
-            var el = document.getElementById(soundId);
-            el.currentTime = 0;
-            el.play();
+            // Map old sound IDs to distinct tones
+            if (soundId === 'sound-added')     { playBeep(880, 0.3, 0.4); }
+            if (soundId === 'sound-completed') { playBeep(1046, 0.3, 0.4); setTimeout(function(){ playBeep(1318, 0.3, 0.3); }, 150); }
+            if (soundId === 'sound-message')   { playBeep(659, 0.4, 0.4); }
+            if (soundId === 'sound-alert')     { playBeep(523, 0.15, 0.5); setTimeout(function(){ playBeep(659, 0.15, 0.5); }, 180); setTimeout(function(){ playBeep(784, 0.3, 0.5); }, 360); }
+        }
+
+        function startChime() {
+            if (chimeInterval) return;
+            safePlay('sound-alert');
+            chimeInterval = setInterval(function() {
+                safePlay('sound-alert');
+            }, 3000);
+        }
+
+        function stopChime() {
+            if (chimeInterval) { clearInterval(chimeInterval); chimeInterval = null; }
+        }
+
+        function unlockAudioChannel() {
+            try {
+                var ctx = getAudioCtx();
+                // iOS requires resume() inside a user gesture
+                ctx.resume().then(function() { audioUnlocked = true; });
+                // Play a silent buffer to fully unlock on older iOS
+                var buf = ctx.createBuffer(1, 1, 22050);
+                var src = ctx.createBufferSource();
+                src.buffer = buf;
+                src.connect(ctx.destination);
+                src.start(0);
+                audioUnlocked = true;
+            } catch(e) { audioUnlocked = true; }
+            var btn = document.getElementById('audio-lock-btn');
+            btn.style.background = '#6BCB77';
+            btn.innerHTML = "🔊 SOUNDS READY";
         }
 
         /* --- REMOTE ADDITION ALERT ENGINE (HOME HUB ONLY) --- */
@@ -959,22 +1011,12 @@
             var label = writerName ? writerName.toUpperCase() : 'ANOTHER USER';
             banner.innerHTML = '⚠️ NEW ITEM ADDED BY ' + label + ' — TAP TO DISMISS ⚠️';
             banner.style.display = 'block';
-
-            // Start repeating sound every 4 seconds
-            if (!remoteAlertInterval) {
-                safePlay('sound-alert');
-                remoteAlertInterval = setInterval(function() {
-                    safePlay('sound-alert');
-                }, 4000);
-            }
+            startChime();
         }
 
         function dismissRemoteAlert() {
             document.getElementById('remote-alert-banner').style.display = 'none';
-            if (remoteAlertInterval) {
-                clearInterval(remoteAlertInterval);
-                remoteAlertInterval = null;
-            }
+            stopChime();
         }
 
         /* --- INFINITE MONTH CALENDAR GENERATION ENGINE --- */
