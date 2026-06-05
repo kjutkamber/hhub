@@ -747,23 +747,30 @@
         function processSetupString() {
             var raw = document.getElementById('fb-credentials-block').value;
 
-            // Parse the label+value block format (handles backtick-wrapped values too)
-            function extractField(label) {
-                // Match label then capture the value on same or next line, strip backticks
-                var re = new RegExp(label + '[\s\S]*?`?([^`\n\r]+)`?', 'i');
-                var m = raw.match(re);
-                return m ? m[1].trim().replace(/`/g, '') : '';
+            // Split into non-empty lines, strip backticks/whitespace
+            var lines = raw.split(/\r?\n/).map(function(l) {
+                return l.trim().replace(/`/g, '');
+            }).filter(function(l) { return l !== ''; });
+
+            // Build a map: normalised label -> next line value
+            var map = {};
+            var knownLabels = { 'api key': 'apiKey', 'auth domain': 'authDomain', 'database url': 'databaseURL', 'project id': 'projectId' };
+            for (var i = 0; i < lines.length - 1; i++) {
+                var norm = lines[i].toLowerCase().replace(/\s+/g, ' ');
+                if (knownLabels[norm]) {
+                    map[knownLabels[norm]] = lines[i + 1].trim();
+                }
             }
 
             var config = {
-                apiKey:      extractField('API Key'),
-                authDomain:  extractField('Auth Domain'),
-                databaseURL: extractField('Database URL'),
-                projectId:   extractField('Project ID')
+                apiKey:      map.apiKey      || '',
+                authDomain:  map.authDomain  || '',
+                databaseURL: map.databaseURL || '',
+                projectId:   map.projectId   || ''
             };
 
             if (!config.apiKey || !config.databaseURL) {
-                return alert("Could not find API Key and Database URL in the pasted text. Make sure you copied the full block.");
+                return alert("Could not read credentials. Paste the block with each label on one line and its value on the next.");
             }
 
             localStorage.setItem('family_hub_config', JSON.stringify(config));
