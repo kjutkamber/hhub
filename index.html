@@ -430,90 +430,104 @@
         .task-due.urgent { color: #FF0000; font-weight: 900; }
         .task-due.overdue { color: #FF0000; text-decoration: line-through; }
 
-        /* --- TAB 3: POP-ART MESSAGE BULLETIN BOARD --- */
+        /* --- TAB 3: MESSAGE BOARD (responsive feed) --- */
         #bulletin-view {
             background: #10B981;
-            position: absolute;
-            overflow: hidden;
-            padding: 0;
-        }
-        .board-controls {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 100;
-            width: 240px;
-            background: #FFF;
+            overflow-y: auto;
             padding: 12px;
-            border: 3px solid #000;
+            display: none;
         }
-        .board-controls textarea {
-            width: 100%;
-            height: 60px;
-            border: 2px solid #000;
-            padding: 6px;
-            font-size: 13px;
-            margin-bottom: 8px;
-            resize: none;
-            outline: none;
-        }
-        
-        /* Peeking Sticky Notes Styling Framework */
-        .sticky-note {
-            position: absolute;
-            width: 160px;
-            height: 160px;
-            border: 4px solid #000;
-            box-shadow: 8px 8px 0px #000;
-            padding: 0;
-            cursor: move;
-            z-index: 10;
-            -webkit-transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transition: left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
-        }
+        #bulletin-view.active { display: block; }
 
-        
-        .note-color-1 { background: #FF9F43; }
-        .note-color-2 { background: #54a0ff; }
-        .note-color-3 { background: #feca57; }
-        
-        .note-body {
-            padding: 10px;
-            font-size: 13px;
-            height: 95px;
-            overflow: hidden;
-            line-height: 1.3;
-        }
-        .note-meta {
-            position: absolute;
-            bottom: 8px;
-            right: 12px;
-            font-size: 11px;
-            text-transform: uppercase;
-            background: #000;
-            color: #FFF;
-            padding: 2px 6px;
-        }
-
-        #trash-bin {
-            position: absolute;
-            bottom: 25px;
-            right: 25px;
-            width: 80px;
-            height: 80px;
-            background: #FF6B6B;
+        /* Write box pinned at top */
+        #note-compose {
+            background: #FFF;
             border: 4px solid #000;
             box-shadow: 6px 6px 0px #000;
-            text-align: center;
-            line-height: 72px;
-            font-size: 32px;
-            z-index: 1;
+            margin-bottom: 14px;
+            overflow: hidden;
         }
-        #trash-bin.hover {
+        #note-compose .window-bar { font-size: 13px; }
+        #note-compose textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: none;
+            border-bottom: 3px solid #000;
+            resize: none;
+            outline: none;
+            height: 70px;
+            font-family: Helvetica, Arial, sans-serif;
+        }
+        #note-compose button {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        /* Note card feed */
+        #note-feed {
+            /* two-column grid on wide screens */
+            overflow: hidden;
+        }
+        .note-card {
+            float: left;
+            width: calc(50% - 8px);
+            margin: 0 8px 12px 0;
+            border: 4px solid #000;
+            box-shadow: 6px 6px 0px #000;
+            overflow: hidden;
+            position: relative;
+        }
+        .note-card:nth-child(even) { margin-right: 0; }
+        .note-card .note-card-bar {
             background: #000;
-            color: #FF6B6B;
+            color: #FFF;
+            padding: 6px 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: Impact, Arial Black, sans-serif;
+            overflow: hidden;
+        }
+        .note-card .note-card-body {
+            padding: 12px;
+            font-size: 14px;
+            font-family: Helvetica, Arial, sans-serif;
+            font-weight: 400;
+            line-height: 1.4;
+            min-height: 60px;
+            word-wrap: break-word;
+        }
+        .note-card .note-del-btn {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            background: #FF6B6B;
+            border: 2px solid #FFF;
+            color: #000;
+            font-size: 13px;
+            font-weight: 900;
+            width: 22px;
+            height: 22px;
+            line-height: 18px;
+            text-align: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        .note-color-1 .note-card-body { background: #FF9F43; }
+        .note-color-2 .note-card-body { background: #54a0ff; }
+        .note-color-3 .note-card-body { background: #feca57; }
+
+        /* Single column on small screens */
+        @media (max-width: 500px) {
+            .note-card { width: 100%; margin-right: 0; }
+        }
+        @media (max-width: 900px) and (orientation: landscape) {
+            .note-card { width: calc(33.333% - 8px); }
+            .note-card:nth-child(even) { margin-right: 8px; }
+            .note-card:nth-child(3n) { margin-right: 0; }
+            #note-compose textarea { height: 50px; }
         }
 
         /* --- CENTRE-SCREEN NOTIFICATION OVERLAY --- */
@@ -711,19 +725,14 @@
         </div>
     </div>
 
-    <!-- TAB 3: POP-ART MESSAGE BOARD BULLETIN -->
+    <!-- TAB 3: MESSAGE BOARD -->
     <div id="bulletin-view" class="view-content">
-        
-        <div class="board-controls brutal-block">
-            <div class="window-bar">WRITE_STICKY</div>
-            <div style="padding:10px; background:#FFF;">
-                <textarea id="note-input" placeholder="Type memo context..."></textarea>
-                <button class="brutal-btn" style="width:100%; padding:8px;" onclick="addNewStickyNote()">PIN TO BOARD</button>
-            </div>
+        <div id="note-compose">
+            <div class="window-bar">📝 NEW MESSAGE</div>
+            <textarea id="note-input" placeholder="Write a message for everyone..."></textarea>
+            <button class="brutal-btn" onclick="addNewStickyNote()">POST MESSAGE</button>
         </div>
-
-        <!-- Interactive Trash Coordinates Bucket -->
-        <div id="trash-bin">🗑️</div>
+        <div id="note-feed"></div>
     </div>
 
     <!-- SYSTEM CORE AUDIO TRANSLATOR FILE ASSETS -->
@@ -885,16 +894,7 @@
                     stickyNotes = filtered;
                 });
 
-                // Watch for position changes (moves from other devices)
-                db.ref('stickyNotes').on('child_changed', function(snap) {
-                    var note = snap.val();
-                    var el = document.getElementById('sticky-node-id-' + note.id);
-                    if (el && !activeDragElement) {
-                        // Only update if we're not the one dragging it
-                        el.style.left = (note.left || 0) + 'px';
-                        el.style.top  = (note.top  || 0) + 'px';
-                    }
-                });
+
             });
 
             startDeadlineChecker();
@@ -1382,99 +1382,7 @@
             board.appendChild(div);
         }
 
-        /* --- TOUCH POINTER TRANSLATE ENGINE FOR RETRO SAFARI CORES --- */
-        function initDrag(e) {
-            var targetNode = e.currentTarget;
-            // Prevent dragging while note is in locked peeking mode position layout
-            if (targetNode.className.indexOf('peeking') !== -1) return;
-
-            var eventObject = e.changedTouches ? e.changedTouches[0] : e;
-            activeDragElement = targetNode;
-            
-            // Override transition locks on active moving objects instantly
-            activeDragElement.style.transition = "none";
-            activeDragElement.style.webkitTransition = "none";
-
-            startX = eventObject.clientX;
-            startY = eventObject.clientY;
-            
-            initialX = activeDragElement.offsetLeft;
-            initialY = activeDragElement.offsetTop;
-            
-            activeDragElement.style.zIndex = 1000;
-
-            document.addEventListener('mousemove', doDrag, false);
-            document.addEventListener('mouseup', stopDrag, false);
-            document.addEventListener('touchmove', doDrag, false);
-            document.addEventListener('touchend', stopDrag, false);
-        }
-
-        function doDrag(e) {
-            if(!activeDragElement) return;
-            e.preventDefault(); 
-            
-            var eventObject = e.changedTouches ? e.changedTouches[0] : e;
-            var deltaX = eventObject.clientX - startX;
-            var deltaY = eventObject.clientY - startY;
-            
-            activeDragElement.style.left = (initialX + deltaX) + 'px';
-            activeDragElement.style.top = (initialY + deltaY) + 'px';
-
-            var trash = document.getElementById('trash-bin');
-            var trashRect = trash.getBoundingClientRect();
-            
-            if(eventObject.clientX > trashRect.left && eventObject.clientX < trashRect.right &&
-               eventObject.clientY > trashRect.top && eventObject.clientY < trashRect.bottom) {
-                trash.className = "hover";
-            } else {
-                trash.className = "";
-            }
-        }
-
-        function stopDrag(e) {
-            if(!activeDragElement) return;
-            
-            var eventObject = e.changedTouches ? e.changedTouches[0] : e;
-            var trash = document.getElementById('trash-bin');
-            var trashRect = trash.getBoundingClientRect();
-            var noteId = activeDragElement.id.replace('sticky-node-id-', '');
-            
-            if(eventObject.clientX > trashRect.left && eventObject.clientX < trashRect.right &&
-               eventObject.clientY > trashRect.top && eventObject.clientY < trashRect.bottom) {
-                // Delete from Firebase — child_removed listener handles DOM removal on all devices
-                if (db) {
-                    db.ref('stickyNotes/' + noteId).remove();
-                } else {
-                    activeDragElement.parentNode.removeChild(activeDragElement);
-                }
-                // Remove locally immediately on this device too
-                activeDragElement.parentNode.removeChild(activeDragElement);
-                var filtered = [];
-                for (var i = 0; i < stickyNotes.length; i++) {
-                    if (String(stickyNotes[i].id) !== noteId) filtered.push(stickyNotes[i]);
-                }
-                stickyNotes = filtered;
-                safePlay('sound-completed');
-            } else {
-                // Save new position to Firebase so all devices see the move
-                var newLeft = parseInt(activeDragElement.style.left, 10);
-                var newTop  = parseInt(activeDragElement.style.top, 10);
-                if (db) {
-                    db.ref('stickyNotes/' + noteId + '/left').set(newLeft);
-                    db.ref('stickyNotes/' + noteId + '/top').set(newTop);
-                }
-                activeDragElement.style.zIndex = 10;
-                activeDragElement.style.transition = "none";
-                activeDragElement.style.webkitTransition = "none";
-            }
-            
-            trash.className = "";
-            activeDragElement = null;
-            document.removeEventListener('mousemove', doDrag, false);
-            document.removeEventListener('mouseup', stopDrag, false);
-            document.removeEventListener('touchmove', doDrag, false);
-            document.removeEventListener('touchend', stopDrag, false);
-        }
+        /* drag removed — board is now a scrollable feed */
     </script>
 </body>
 </html>
