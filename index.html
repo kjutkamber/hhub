@@ -419,6 +419,16 @@
             font-size: 12px;
             cursor: pointer;
         }
+        .task-due {
+            display: block;
+            clear: both;
+            font-size: 12px;
+            color: #555;
+            padding-top: 6px;
+            font-family: Helvetica, Arial, sans-serif;
+        }
+        .task-due.urgent { color: #FF0000; font-weight: 900; }
+        .task-due.overdue { color: #FF0000; text-decoration: line-through; }
 
         /* --- TAB 3: POP-ART MESSAGE BULLETIN BOARD --- */
         #bulletin-view {
@@ -506,28 +516,36 @@
             color: #FF6B6B;
         }
 
-        /* --- REMOTE ADDITION ALERT BANNER --- */
+        /* --- CENTRE-SCREEN NOTIFICATION OVERLAY --- */
         #remote-alert-banner {
             display: none;
             position: fixed;
-            top: 75px;
-            left: 0;
-            width: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.55);
+            z-index: 9000;
+            cursor: pointer;
+        }
+        #remote-alert-inner {
+            position: absolute;
+            top: 50%; left: 50%;
+            -webkit-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
             background: #FF6B6B;
-            border-bottom: 4px solid #000;
-            box-shadow: 0 6px 0px #000;
-            z-index: 500;
-            padding: 12px 20px;
+            border: 5px solid #000;
+            box-shadow: 10px 10px 0px #000;
+            padding: 32px 40px;
             text-align: center;
             font-family: "Impact", "Arial Black", sans-serif;
-            font-size: 18px;
+            font-size: 22px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #000;
+            min-width: 260px;
+            max-width: 80%;
             -webkit-animation: alertPulse 0.6s ease-in-out infinite alternate;
             animation: alertPulse 0.6s ease-in-out infinite alternate;
-            cursor: pointer;
         }
+        #remote-alert-inner p { font-size: 13px; margin-top: 10px; font-family: Helvetica, Arial, sans-serif; }
         @-webkit-keyframes alertPulse {
             from { background: #FF6B6B; }
             to   { background: #FFDE4D; }
@@ -536,12 +554,36 @@
             from { background: #FF6B6B; }
             to   { background: #FFDE4D; }
         }
-        @media (max-width: 768px) {
+        /* --- HORIZONTAL TABLET OPTIMISATION --- */
+        @media (max-width: 900px) and (orientation: landscape) {
+            #app-header { height: 50px; padding: 6px 12px; }
+            #app-title { font-size: 20px; line-height: 36px; }
+            .audio-btn, .profile-indicator { padding: 5px 10px; font-size: 11px; }
+            #tab-bar { height: 52px; padding: 4px; }
+            .tab-btn { height: 44px; font-size: 12px; }
+            .view-content { top: 50px; bottom: 52px; padding: 10px; }
+            #bulletin-view { top: 50px; bottom: 52px; }
+            .cal-adder-sidebar { width: 30%; float: left; margin-bottom: 0; padding: 8px; }
+            .cal-grid-main { width: 68%; float: right; }
+            .calendar-grid td { height: 60px; }
+            .form-field input, .form-field select { padding: 6px; font-size: 12px; }
+            .brutal-btn { padding: 8px; font-size: 12px; }
+            .task-item { padding: 10px; margin-bottom: 8px; }
+            .task-text { font-size: 14px; }
+            .sticky-note { width: 140px; height: 140px; }
+            .note-body { font-size: 12px; height: 80px; }
+            .board-controls { width: 190px; }
+            .board-controls textarea { height: 45px; font-size: 12px; }
+            .tasks-container { max-width: 100%; }
+            .input-group input { font-size: 13px; padding: 10px; }
+            #remote-alert-banner { font-size: 14px; padding: 8px; }
+            .task-due { font-size: 11px; }
+        }
+        @media (max-width: 768px) and (orientation: portrait) {
             .cal-adder-sidebar { width: 100%; float: none; margin-bottom: 20px; }
             .cal-grid-main { width: 100%; float: none; }
             .calendar-grid td { height: 75px; }
             .sticky-note { width: 130px; height: 130px; }
-            .sticky-note.peeking { left: -110px !important; }
             .note-body { font-size: 11px; height: 65px; }
         }
     </style>
@@ -580,9 +622,12 @@
         </div>
     </div>
 
-    <!-- REMOTE ADDITION ALERT BANNER (Home Hub only) -->
+    <!-- CENTRE-SCREEN NOTIFICATION -->
     <div id="remote-alert-banner" onclick="dismissRemoteAlert()">
-        ⚠️ NEW ITEM ADDED FROM ANOTHER DEVICE — TAP TO DISMISS ⚠️
+        <div id="remote-alert-inner">
+            <div id="remote-alert-text">⚠️ NEW ITEM ADDED</div>
+            <p>Tap anywhere to dismiss</p>
+        </div>
     </div>
 
     <!-- TOP SYSTEM STATUS CONSOLE BAR -->
@@ -656,8 +701,9 @@
     <div id="tasks-view" class="view-content">
         <div class="tasks-container">
             <div class="input-group">
-                <input type="text" id="task-input" placeholder="WRITE NEW TASK STREAM INDEX...">
-                <button class="brutal-btn" onclick="addNewTask()">ADD TASK</button>
+                <input type="text" id="task-input" placeholder="WRITE NEW TASK STREAM INDEX..." style="width:60%; float:left;">
+                <input type="time" id="task-due-time" style="width:15%; float:left; padding:16px 4px; font-size:13px; border:4px solid #000; border-left:none; outline:none; background:#fff;">
+                <button class="brutal-btn" onclick="addNewTask()" style="width:25%; float:left; border-left:none;">ADD TASK</button>
             </div>
             <ul class="task-list" id="task-list-element">
                 <!-- Tasks drop here dynamically -->
@@ -813,7 +859,7 @@
                 }
                 _loaded.notes = true;
 
-                // Now watch for new additions
+                // Watch for new notes
                 db.ref('stickyNotes').on('child_added', function(snap) {
                     var note = snap.val();
                     var found = false;
@@ -826,7 +872,32 @@
                         if (_loaded.notes) checkRemoteAlert('note', note);
                     }
                 });
+
+                // Watch for deletions — removes DOM node on all devices
+                db.ref('stickyNotes').on('child_removed', function(snap) {
+                    var noteId = String(snap.key);
+                    var el = document.getElementById('sticky-node-id-' + noteId);
+                    if (el && el.parentNode) el.parentNode.removeChild(el);
+                    var filtered = [];
+                    for (var i = 0; i < stickyNotes.length; i++) {
+                        if (String(stickyNotes[i].id) !== noteId) filtered.push(stickyNotes[i]);
+                    }
+                    stickyNotes = filtered;
+                });
+
+                // Watch for position changes (moves from other devices)
+                db.ref('stickyNotes').on('child_changed', function(snap) {
+                    var note = snap.val();
+                    var el = document.getElementById('sticky-node-id-' + note.id);
+                    if (el && !activeDragElement) {
+                        // Only update if we're not the one dragging it
+                        el.style.left = (note.left || 0) + 'px';
+                        el.style.top  = (note.top  || 0) + 'px';
+                    }
+                });
             });
+
+            startDeadlineChecker();
         }
 
         function checkRemoteAlert(type, item) {
@@ -988,10 +1059,9 @@
         }
 
         function triggerRemoteAlert(writerName) {
-            var banner = document.getElementById('remote-alert-banner');
-            var label = writerName ? writerName.toUpperCase() : 'ANOTHER USER';
-            banner.innerHTML = '⚠️ NEW ITEM ADDED BY ' + label + ' — TAP TO DISMISS ⚠️';
-            banner.style.display = 'block';
+            var label = writerName ? writerName.toUpperCase() : 'ANOTHER DEVICE';
+            document.getElementById('remote-alert-text').innerHTML = '⚠️ NEW ITEM ADDED BY ' + label;
+            document.getElementById('remote-alert-banner').style.display = 'block';
             startChime();
         }
 
@@ -1131,6 +1201,7 @@
         function renderTasks() {
             var listAnchor = document.getElementById('task-list-element');
             listAnchor.innerHTML = "";
+            var now = new Date();
 
             for (var i = 0; i < taskItems.length; i++) {
                 var task = taskItems[i];
@@ -1139,14 +1210,28 @@
 
                 var checkedState = task.completed ? 'checked' : '';
                 var textClass = task.completed ? 'task-text completed' : 'task-text';
-                // Store id as data attribute to avoid large-number JS parsing issues on iOS
                 li.setAttribute('data-task-id', String(task.id));
+
+                // Due time label
+                var dueLabel = '';
+                if (task.dueTime && !task.completed) {
+                    var dueParts = task.dueTime.split(':');
+                    var dueDate = new Date();
+                    dueDate.setHours(parseInt(dueParts[0], 10), parseInt(dueParts[1], 10), 0, 0);
+                    var diffMs = dueDate - now;
+                    var diffMin = Math.round(diffMs / 60000);
+                    var dueClass = 'task-due';
+                    if (diffMin < 0) { dueClass += ' overdue'; dueLabel = '⏰ OVERDUE (' + task.dueTime + ')'; }
+                    else if (diffMin <= 5) { dueClass += ' urgent'; dueLabel = '🔴 DUE IN ' + diffMin + ' MIN (' + task.dueTime + ')'; }
+                    else { dueLabel = '⏱ Due: ' + task.dueTime; }
+                    dueLabel = '<span class="' + dueClass + '">' + dueLabel + '</span>';
+                }
 
                 li.innerHTML = '<input type="checkbox" class="task-checkbox" ' + checkedState + '>' +
                                '<span class="' + textClass + '">' + task.text + '</span>' +
-                               '<button class="task-del-btn">DELETE</button>';
+                               '<button class="task-del-btn">DEL</button>' +
+                               dueLabel;
 
-                // Attach events via JS (not inline) so IDs are always treated as strings
                 (function(taskObj, liEl) {
                     liEl.querySelector('.task-checkbox').onchange = function() { toggleTask(String(taskObj.id)); };
                     liEl.querySelector('.task-del-btn').onclick   = function() { deleteTask(String(taskObj.id)); };
@@ -1158,24 +1243,51 @@
 
         function addNewTask() {
             var input = document.getElementById('task-input');
+            var dueInput = document.getElementById('task-due-time');
             if (input.value.trim() === "") return;
 
             var newTask = {
-                id: String(new Date().getTime()),  // always string
+                id: String(new Date().getTime()),
                 text: input.value,
                 completed: false,
-                addedBy: currentUser || 'unknown'
+                addedBy: currentUser || 'unknown',
+                dueTime: dueInput.value || ''
             };
 
             input.value = "";
+            dueInput.value = "";
             if (db) {
-                // Firebase is source of truth; listener will re-render
                 db.ref('tasks/' + newTask.id).set(newTask);
             } else {
                 taskItems.push(newTask);
                 renderTasks();
             }
             safePlay('sound-added');
+        }
+
+        // Check every 30s if any task is due in 5 minutes
+        var _warnedTasks = {};
+        function startDeadlineChecker() {
+            setInterval(function() {
+                var now = new Date();
+                for (var i = 0; i < taskItems.length; i++) {
+                    var t = taskItems[i];
+                    if (!t.dueTime || t.completed || _warnedTasks[t.id]) continue;
+                    var parts = t.dueTime.split(':');
+                    var due = new Date();
+                    due.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+                    var diffMin = (due - now) / 60000;
+                    if (diffMin >= 0 && diffMin <= 5) {
+                        _warnedTasks[t.id] = true;
+                        safePlay('sound-alert');
+                        renderTasks(); // refresh red label
+                        // Also show a notification banner
+                        document.getElementById('remote-alert-text').innerHTML = '⏰ TASK DUE SOON: ' + t.text.toUpperCase();
+                        document.getElementById('remote-alert-banner').style.display = 'block';
+                        startChime();
+                    }
+                }
+            }, 30000);
         }
 
         function toggleTask(taskId) {
@@ -1252,8 +1364,8 @@
             // Use screen size directly — board may be hidden so offsetWidth can be 0
             var bw = window.innerWidth;
             var bh = window.innerHeight - 155; // subtract header + tab bar
-            var centreLeft = Math.max(10, Math.round((bw - noteW) / 2) + Math.floor(Math.random() * 80) - 40);
-            var centreTop  = Math.max(10, Math.round((bh - noteH) / 2) + Math.floor(Math.random() * 80) - 40);
+            var centreLeft = (note.left !== undefined) ? note.left : Math.max(10, Math.round((bw - noteW) / 2) + Math.floor(Math.random() * 80) - 40);
+            var centreTop  = (note.top  !== undefined) ? note.top  : Math.max(10, Math.round((bh - noteH) / 2) + Math.floor(Math.random() * 80) - 40);
 
             var div = document.createElement('div');
             div.className = 'sticky-note note-color-' + note.color; // no hidden class
@@ -1325,36 +1437,39 @@
             var eventObject = e.changedTouches ? e.changedTouches[0] : e;
             var trash = document.getElementById('trash-bin');
             var trashRect = trash.getBoundingClientRect();
+            var noteId = activeDragElement.id.replace('sticky-node-id-', '');
             
             if(eventObject.clientX > trashRect.left && eventObject.clientX < trashRect.right &&
                eventObject.clientY > trashRect.top && eventObject.clientY < trashRect.bottom) {
-                
-                var elementIdString = activeDragElement.id.replace("sticky-node-id-", "");
-                var numericId = parseInt(elementIdString);
-
-                var filteredNotes = [];
-                for (var i = 0; i < stickyNotes.length; i++) {
-                    if (stickyNotes[i].id !== numericId) {
-                        filteredNotes.push(stickyNotes[i]);
-                    }
-                }
-                stickyNotes = filteredNotes;
-
+                // Delete from Firebase — child_removed listener handles DOM removal on all devices
                 if (db) {
-                    db.ref('stickyNotes/' + numericId).remove();
+                    db.ref('stickyNotes/' + noteId).remove();
+                } else {
+                    activeDragElement.parentNode.removeChild(activeDragElement);
                 }
+                // Remove locally immediately on this device too
                 activeDragElement.parentNode.removeChild(activeDragElement);
+                var filtered = [];
+                for (var i = 0; i < stickyNotes.length; i++) {
+                    if (String(stickyNotes[i].id) !== noteId) filtered.push(stickyNotes[i]);
+                }
+                stickyNotes = filtered;
                 safePlay('sound-completed');
             } else {
+                // Save new position to Firebase so all devices see the move
+                var newLeft = parseInt(activeDragElement.style.left, 10);
+                var newTop  = parseInt(activeDragElement.style.top, 10);
+                if (db) {
+                    db.ref('stickyNotes/' + noteId + '/left').set(newLeft);
+                    db.ref('stickyNotes/' + noteId + '/top').set(newTop);
+                }
                 activeDragElement.style.zIndex = 10;
-                // Re-apply pop structural cubic motion animation matrices safely back
-                activeDragElement.style.transition = "left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
-                activeDragElement.style.webkitTransition = "left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                activeDragElement.style.transition = "none";
+                activeDragElement.style.webkitTransition = "none";
             }
             
             trash.className = "";
             activeDragElement = null;
-            
             document.removeEventListener('mousemove', doDrag, false);
             document.removeEventListener('mouseup', stopDrag, false);
             document.removeEventListener('touchmove', doDrag, false);
