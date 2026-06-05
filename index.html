@@ -463,26 +463,7 @@
             -webkit-transform: translateZ(0);
             transform: translateZ(0);
         }
-        /* Hidden state: note spawns invisible at centre, tap to reveal */
-        .sticky-note.note-hidden {
-            opacity: 0;
-            cursor: pointer;
-            -webkit-transform: scale(0.5);
-            transform: scale(0.5);
-            -webkit-transition: opacity 0.25s ease, -webkit-transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        /* Pulse ring to hint that something is waiting */
-        .sticky-note.note-hidden::after {
-            content: "✉";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            -webkit-transform: translate(-50%, -50%);
-            transform: translate(-50%, -50%);
-            font-size: 32px;
-            opacity: 1;
-        }
+
         
         .note-color-1 { background: #FF9F43; }
         .note-color-2 { background: #54a0ff; }
@@ -1266,40 +1247,27 @@
 
         function spawnStickyDOMNode(note) {
             var board = document.getElementById('bulletin-view');
-            var bw = board.offsetWidth  || window.innerWidth;
-            var bh = board.offsetHeight || window.innerHeight;
             var noteW = 160;
             var noteH = 160;
-
-            // Centre of board, with a little random scatter so notes don't stack perfectly
-            var centreLeft = Math.round((bw - noteW) / 2) + Math.floor(Math.random() * 60) - 30;
-            var centreTop  = Math.round((bh - noteH) / 2) + Math.floor(Math.random() * 60) - 30;
+            // Use screen size directly — board may be hidden so offsetWidth can be 0
+            var bw = window.innerWidth;
+            var bh = window.innerHeight - 155; // subtract header + tab bar
+            var centreLeft = Math.max(10, Math.round((bw - noteW) / 2) + Math.floor(Math.random() * 80) - 40);
+            var centreTop  = Math.max(10, Math.round((bh - noteH) / 2) + Math.floor(Math.random() * 80) - 40);
 
             var div = document.createElement('div');
-            // Start invisible at centre; no peeking class — hidden via opacity instead
-            div.className = 'sticky-note note-hidden note-color-' + note.color;
-            div.id = "sticky-node-id-" + note.id;
+            div.className = 'sticky-note note-color-' + note.color; // no hidden class
+            div.id = 'sticky-node-id-' + note.id;
             div.style.left = centreLeft + 'px';
             div.style.top  = centreTop  + 'px';
 
             div.setAttribute('ontouchstart', 'initDrag(event)');
             div.setAttribute('onmousedown', 'initDrag(event)');
-            div.setAttribute('onclick', 'handleStickyClick(event)');
 
-            div.innerHTML = '<div class="window-bar"><div class="window-dots"><div class="window-dot"></div></div>MEMO</div>' +
-                            '<div class="note-body">' + note.text + '</div>' +
-                            '<div class="note-meta">' + note.author + '</div>';
+            div.innerHTML = '<div class="window-bar"><div class="window-dots"><div class="window-dot"></div></div>' + note.author + '</div>' +
+                            '<div class="note-body">' + note.text + '</div>';
 
             board.appendChild(div);
-        }
-
-        function handleStickyClick(e) {
-            var element = e.currentTarget;
-            if (element.className.indexOf('note-hidden') !== -1) {
-                // Reveal the note in place with a pop animation
-                element.className = element.className.replace(' note-hidden', '').replace('note-hidden', '');
-                safePlay('sound-message');
-            }
         }
 
         /* --- TOUCH POINTER TRANSLATE ENGINE FOR RETRO SAFARI CORES --- */
